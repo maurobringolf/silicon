@@ -28,7 +28,7 @@ import interfaces.{Failure => SiliconFailure}
 import state.terms.FullPerm
 import state.{MapBackedStore, DefaultHeapCompressor, ListBackedHeap, MutableSetBackedPathConditions,
     DefaultState, DefaultStateFactory, DefaultPathConditionsFactory, DefaultSymbolConvert, DefaultContext}
-import decider.{SMTLib2PreambleEmitter, DefaultDecider}
+import viper.silicon.decider.{Z3ProverStdIO, SMTLib2PreambleEmitter, DefaultDecider}
 import reporting.{VerificationException, Bookkeeper}
 import supporters.{DefaultSetsEmitter, DefaultDomainsEmitter, DefaultDomainsTranslator, DefaultMultisetsEmitter,
     DefaultSequencesEmitter}
@@ -63,6 +63,7 @@ object Silicon {
   val buildVersion = s"$sbtProjectVersion ${hgid.version} ${hgid.branch} $buildDate"
   val copyright = "(c) Copyright ETH Zurich 2012 - 2015"
   val z3ExeEnvironmentVariable = "Z3_EXE"
+  val cvc4ExeEnvironmentVariable = "CVC4_EXE"
   val z3MinVersion = Version("4.3.2")
   val z3MaxVersion: Option[Version] = None
   val dependencies = Seq(SilDefaultDependency("Z3", z3MinVersion.version, "http://z3.codeplex.com/"))
@@ -218,7 +219,7 @@ class Silicon(private var debugInfo: Seq[(String, Any)] = Nil)
 
     decider.start()
 
-    val preambleEmitter = new SMTLib2PreambleEmitter(decider.prover.asInstanceOf[silicon.decider.Z3ProverStdIO])
+    val preambleEmitter = new SMTLib2PreambleEmitter(decider.prover.asInstanceOf[Z3ProverStdIO])
     val sequencesEmitter = new DefaultSequencesEmitter(decider.prover, symbolConverter, preambleEmitter)
     val setsEmitter = new DefaultSetsEmitter(decider.prover, symbolConverter, preambleEmitter)
     val multisetsEmitter = new DefaultMultisetsEmitter(decider.prover, symbolConverter, preambleEmitter)
