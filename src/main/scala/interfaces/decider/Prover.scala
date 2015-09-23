@@ -8,8 +8,10 @@ package viper
 package silicon
 package interfaces.decider
 
+import java.nio.file.Path
 import silver.components.StatefulComponent
 import state.terms.{Sort, Decl, Term, Var}
+import common.config.Version
 
 sealed abstract class Result
 object Sat extends Result
@@ -21,6 +23,8 @@ trait Prover extends StatefulComponent {
   def assume(term: Term)
   def assert(goal: Term, timeout: Int = 0): Boolean
   def check(timeout: Int = 0): Result
+  def push(n: Int = 1)
+  def pop(n: Int = 1)
   def enableLoggingComments(enabled: Boolean)
   def logComment(str: String)
   def fresh(id: String, sort: Sort): Var
@@ -28,4 +32,6 @@ trait Prover extends StatefulComponent {
   def declare(decl: Decl)
   def statistics(): Map[String, String]
   def proverRunStarts()
+  def version(): Version
+  def path(): Path
 }

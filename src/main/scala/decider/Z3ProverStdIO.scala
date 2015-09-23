@@ -29,12 +29,14 @@ class Z3ProverStdIO(config: Config, bookkeeper: Bookkeeper) extends Prover with 
   private var z3: Process = _
   private var input: BufferedReader = _
   private var output: PrintWriter = _
-  /* private */ var z3Path: Path = _
+  private var _path: Path = _
   private var logPath: Path = _
   private var counter: Counter = _
   private var lastTimeout: Int = 0
 
-  def z3Version(): Version = {
+  def path() = _path
+
+  def version(): Version = {
     val versionPattern = """\(?\s*:version\s+"(.*?)"\)?""".r
     var line = ""
 
@@ -53,7 +55,7 @@ class Z3ProverStdIO(config: Config, bookkeeper: Bookkeeper) extends Prover with 
     counter = new Counter()
     logPath = config.z3LogFile
     logFile = silver.utility.Common.PrintWriter(logPath.toFile)
-    z3Path = Paths.get(config.z3Exe)
+    _path = Paths.get(config.z3Exe)
     z3 = createZ3Instance()
     input = new BufferedReader(new InputStreamReader(z3.getInputStream))
     output = new PrintWriter(new BufferedWriter(new OutputStreamWriter(z3.getOutputStream)), true)
@@ -65,7 +67,7 @@ class Z3ProverStdIO(config: Config, bookkeeper: Bookkeeper) extends Prover with 
   }
 
   private def createZ3Instance() = {
-    log.info(s"Starting Z3 at $z3Path")
+    log.info(s"Starting Z3 at ${_path}")
 
     val userProvidedZ3Args: Array[String] = config.z3Args.get match {
       case None =>
@@ -76,7 +78,7 @@ class Z3ProverStdIO(config: Config, bookkeeper: Bookkeeper) extends Prover with 
         args.split(' ').map(_.trim)
     }
 
-    val builder = new ProcessBuilder(z3Path.toFile.getPath +: "-smt2" +: "-in" +: userProvidedZ3Args :_*)
+    val builder = new ProcessBuilder(_path.toFile.getPath +: "-smt2" +: "-in" +: userProvidedZ3Args :_*)
     builder.redirectErrorStream(true)
 
     val process = builder.start()

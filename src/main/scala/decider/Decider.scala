@@ -87,26 +87,26 @@ class DefaultDecider[ST <: Store[ST],
   private def createProver(): Option[DependencyNotFoundError] = {
     try {
       z3 = new Z3ProverStdIO(config, bookkeeper)
-      z3.start() /* Cannot query Z3 version otherwise */
+      prover.start()
     } catch {
       case e: java.io.IOException if e.getMessage.startsWith("Cannot run program") =>
         state = State.Erroneous
         val message = (
-          s"Could not execute Z3 at ${z3.z3Path}. Either place z3 in the path, or set "
+          s"Could not execute Z3 at ${prover.path}. Either place z3 in the path, or set "
             + s"the environment variable ${Silicon.z3ExeEnvironmentVariable}, or run "
             + s"Silicon with option --z3Exe")
 
         return Some(DependencyNotFoundError(message))
     }
 
-    val z3Version = z3.z3Version()
-    log.info(s"Using Z3 $z3Version located at ${z3.z3Path}")
+    val version = prover.version()
+    log.info(s"Using Z3 $version located at ${prover.path}")
 
-    if (z3Version < Silicon.z3MinVersion)
-      log.warn(s"Expected at least Z3 version ${Silicon.z3MinVersion.version}, but found $z3Version")
+    if (version < Silicon.z3MinVersion)
+      log.warn(s"Expected at least Z3 version ${Silicon.z3MinVersion.version}, but found $version")
 
-    if (Silicon.z3MaxVersion.fold(false)(_ < z3Version))
-      log.warn(  s"Silicon might not work with Z3 version $z3Version, "
+    if (Silicon.z3MaxVersion.fold(false)(_ < version))
+      log.warn(  s"Silicon might not work with Z3 version $version, "
           + s"consider using a version strictly older than ${Silicon.z3MaxVersion.get}")
 
     None
@@ -127,12 +127,12 @@ class DefaultDecider[ST <: Store[ST],
   }
 
   def reset() {
-    z3.reset()
+    prover.reset()
     pathConditions = pathConditions.empty
   }
 
   def stop() {
-    if (z3 != null) z3.stop()
+    if (prover != null) prover.stop()
     state = State.Stopped
   }
 
@@ -140,11 +140,11 @@ class DefaultDecider[ST <: Store[ST],
 
   def pushScope() {
     pathConditions.pushScope()
-    z3.push()
+    prover.push()
   }
 
   def popScope() {
-    z3.pop()
+    prover.pop()
     pathConditions.popScope()
   }
 
