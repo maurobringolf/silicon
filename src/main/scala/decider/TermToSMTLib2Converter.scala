@@ -117,7 +117,7 @@ class TermToSMTLib2Converter(bookkeeper: Bookkeeper) extends PrettyPrinter with 
     case uop: Not => renderUnaryOp("not", uop)
     case And(ts) => renderNAryOp("and", ts: _*)
     case Or(ts) => renderNAryOp("or", ts: _*)
-    case bop: Implies => renderBinaryOp("implies", bop)
+    case bop: Implies => renderBinaryOp("=>", bop)
     case bop: Iff => renderBinaryOp("iff", bop)
     case bop: BuiltinEquals => renderBinaryOp("=", bop)
 
