@@ -576,6 +576,14 @@ class Config(args: Seq[String]) extends SilFrontendConfig(args, "Silicon") {
     hidden = false
   )
 
+  private val rawCVC4Exe = opt[String]("cvc4Exe",
+    descr = (  "CVC4 executable. The environment variable %s can also "
+      + "be used to specify the path of the executable.").format(Silicon.cvc4ExeEnvironmentVariable),
+    default = None,
+    noshort = true,
+    hidden = false
+  )
+
   lazy val z3Exe: String = {
     val isWindows = System.getProperty("os.name").toLowerCase.startsWith("windows")
 
@@ -583,20 +591,27 @@ class Config(args: Seq[String]) extends SilFrontendConfig(args, "Silicon") {
                 .getOrElse("z3" + (if (isWindows) ".exe" else "")))
   }
 
-  val defaultRawZ3LogFile = "logfile.smt2"
+  lazy val cvc4Exe: String = {
+    val isWindows = System.getProperty("os.name").toLowerCase.startsWith("windows")
 
-  private val rawZ3LogFile = opt[ConfigValue[String]]("z3LogFile",
-    descr = s"Log file containing the interaction with Z3 (default: <tempDirectory>/$defaultRawZ3LogFile)",
-    default = Some(DefaultValue(defaultRawZ3LogFile)),
+    rawCVC4Exe.get.getOrElse(envOrNone(Silicon.cvc4ExeEnvironmentVariable)
+      .getOrElse("cvc4" + (if (isWindows) ".exe" else "")))
+  }
+
+  val defaultRawProverLogFile = "logfile.smt2"
+
+  private val rawProverLogFile = opt[ConfigValue[String]]("proverLogFile",
+    descr = s"Log file containing the interaction with the Prover (default: <tempDirectory>/$defaultRawProverLogFile)",
+    default = Some(DefaultValue(defaultRawProverLogFile)),
     noshort = true,
     hidden = false
   )(singleArgConverter[ConfigValue[String]](s => UserValue(s)))
 
   var inputFile: Option[Path] = None
 
-  private lazy val defaultZ3LogFile = Paths.get(tempDirectory(), defaultRawZ3LogFile)
+  private lazy val defaultZ3LogFile = Paths.get(tempDirectory(), defaultRawProverLogFile)
 
-  def z3LogFile: Path = rawZ3LogFile() match {
+  def proverLogFile: Path = rawProverLogFile() match {
     case UserValue(logfile) =>
       logfile.toLowerCase match {
         case "$infile" =>
@@ -611,8 +626,8 @@ class Config(args: Seq[String]) extends SilFrontendConfig(args, "Silicon") {
       defaultZ3LogFile
   }
 
-  val z3Args = opt[String]("z3Args",
-    descr = (  "Command-line arguments which should be forwarded to Z3. "
+  val proverArgs = opt[String]("proverArgs",
+    descr = (  "Command-line arguments which should be forwarded to the prover. "
              + "The expected format is \"<opt> <opt> ... <opt>\", including the quotation marks."),
     default = None,
     noshort = true,

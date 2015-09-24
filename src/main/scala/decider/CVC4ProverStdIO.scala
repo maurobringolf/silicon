@@ -14,34 +14,14 @@ import viper.silicon.reporting.Bookkeeper
 
 class CVC4ProverStdIO(config: Config, bookkeeper: Bookkeeper) extends ProverStdIO(config, bookkeeper) {
 
+  proverName = "CVC4"
+  startupArgs = List("--lang smt")
+
   // Assuming this does not change during runtime.
-  proverPath = Paths.get(config.z3Exe) // TODO: FIX!
+  proverPath = Paths.get(config.cvc4Exe)
 
-  protected def createInstance() = {
-    log.info(s"Starting Z3 at ${proverPath}")
 
-    val userProvidedZ3Args: Array[String] = config.z3Args.get match {
-      case None =>
-        Array()
-
-      case Some(args) =>
-        log.info(s"Additional command-line arguments are $args")
-        args.split(' ').map(_.trim)
-    }
-
-    val builder = new ProcessBuilder(proverPath.toFile.getPath +: "--lang smt" +: userProvidedZ3Args :_*)
-    builder.redirectErrorStream(true)
-
-    val process = builder.start()
-
-    Runtime.getRuntime.addShutdownHook(new Thread {
-      override def run() {
-        process.destroy()
-      }
-    })
-
-    process
+  def setTimeout(timeout: Int): Unit = {
+    logComment(s"Setting the timeout ($timeout ms) interactively is not supported by CVC4")
   }
-
-  def setTimeout(timeout: Int) {}
 }

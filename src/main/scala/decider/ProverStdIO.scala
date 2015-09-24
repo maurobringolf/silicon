@@ -15,15 +15,17 @@ import org.apache.commons.io.FileUtils
 import org.slf4s.Logging
 import viper.silicon.common.config.Version
 import viper.silicon.interfaces.decider.{Unknown, Unsat, Sat, Prover}
-import viper.silicon.reporting.{Z3InteractionFailed, Bookkeeper}
+import viper.silicon.reporting.{ProverInteractionFailed, Bookkeeper}
 import viper.silicon.state.terms._
 import viper.silicon.utils.Counter
 
-
+/* TODO: Pass a logger, don't open an own file to log to. */
 abstract class ProverStdIO(config: Config, bookkeeper: Bookkeeper) extends Prover with Logging {
   val termConverter = new TermToSMTLib2Converter(bookkeeper)
   import termConverter._
 
+  protected var proverName :String = _
+  protected var startupArgs :List[String] = _
   protected var pushPopScopeDepth = 0
   protected var isLoggingCommentsEnabled: Boolean = true
   protected var logFile: PrintWriter = _
@@ -35,7 +37,32 @@ abstract class ProverStdIO(config: Config, bookkeeper: Bookkeeper) extends Prove
   protected var counter: Counter = _
   protected var lastTimeout: Int = 0
 
-  protected def createInstance(): Process
+  protected def createInstance() = {
+    log.info(s"Starting $proverName at ${proverPath}")
+
+    val userProvidedArgs: List[String] = config.proverArgs.get match {
+      case None =>
+        List()
+
+      case Some(args) =>
+        log.info(s"Additional command-line arguments are $args")
+        args.split(' ').map(_.trim).toList
+    }
+    val builder = new ProcessBuilder(proverPath.toFile.getPath :: startupArgs ::: userProvidedArgs :_*)
+    builder.redirectErrorStream(true)
+
+    val process = builder.start()
+
+    Runtime.getRuntime.addShutdownHook(new Thread {
+      override def run() {
+        process.destroy()
+      }
+    })
+
+    process
+  }
+
+
 
   def path() = proverPath
 
@@ -50,7 +77,7 @@ abstract class ProverStdIO(config: Config, bookkeeper: Bookkeeper) extends Prove
 
     line match {
       case versionPattern(v) => Version(v)
-      case _ => throw new Z3InteractionFailed(s"Unexpected output of Z3 while getting version: $line")
+      case _ => throw new ProverInteractionFailed(s"Unexpected output of Z3 while getting version: $line")
     }
   }
 
@@ -61,7 +88,7 @@ abstract class ProverStdIO(config: Config, bookkeeper: Bookkeeper) extends Prove
 
   def start() {
     counter = new Counter()
-    logPath = config.z3LogFile
+    logPath = config.proverLogFile
     logFile = silver.utility.Common.PrintWriter(logPath.toFile)
     process = createInstance()
     input = new BufferedReader(new InputStreamReader(process.getInputStream))
@@ -88,7 +115,7 @@ abstract class ProverStdIO(config: Config, bookkeeper: Bookkeeper) extends Prove
       process.destroy()
       //      z3.waitFor() /* Makes the current thread wait until the process has been shut down */
 
-      val currentLogPath = config.z3LogFile
+      val currentLogPath = config.proverLogFile
       if (logPath != currentLogPath) {
         /* This is a hack to make it possible to name the SMTLIB logfile after
          * the input file that was verified. Currently, Silicon starts Z3 before
@@ -222,7 +249,7 @@ abstract class ProverStdIO(config: Config, bookkeeper: Bookkeeper) extends Prove
 
       /* Check that the first line starts with "(:". */
       if (line.isEmpty && !line.startsWith("(:"))
-        throw new Z3InteractionFailed(s"Unexpected output of Z3 while reading statistics: $line")
+        throw new ProverInteractionFailed(s"Unexpected output of $proverName while reading statistics: $line")
 
       line match {
         case entryPattern(entryName, entryNumber) =>
@@ -288,7 +315,7 @@ abstract class ProverStdIO(config: Config, bookkeeper: Bookkeeper) extends Prove
     val answer = readLine()
 
     if (answer != "success")
-      throw new Z3InteractionFailed(s"Unexpected output of Z3. Expected 'success' but found: $answer")
+      throw new ProverInteractionFailed(s"Unexpected output of $proverName. Expected 'success' but found: $answer")
   }
 
   protected def readUnsat(): Boolean = readLine() match {
@@ -297,7 +324,7 @@ abstract class ProverStdIO(config: Config, bookkeeper: Bookkeeper) extends Prove
     case "unknown" => false
 
     case result =>
-      throw new Z3InteractionFailed(s"Unexpected output of Z3 while trying to refute an assertion: $result")
+      throw new ProverInteractionFailed(s"Unexpected output of $proverName while trying to refute an assertion: $result")
   }
 
   protected def readLine(): String = {
@@ -309,7 +336,7 @@ abstract class ProverStdIO(config: Config, bookkeeper: Bookkeeper) extends Prove
       if (result.toLowerCase != "success") logComment(result)
 
       val warning = result.startsWith("WARNING")
-      if (warning) log.info(s"Z3: $result")
+      if (warning) log.info(s"$proverName: $result")
 
       repeat = warning
     }

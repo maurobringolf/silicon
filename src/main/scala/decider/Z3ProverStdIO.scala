@@ -12,36 +12,12 @@ import java.nio.file.Paths
 import viper.silicon.reporting.Bookkeeper
 
 
-/* TODO: Pass a logger, don't open an own file to log to. */
 class Z3ProverStdIO(config: Config, bookkeeper: Bookkeeper) extends ProverStdIO(config, bookkeeper) {
 
+  proverName = "Z3"
+  startupArgs = List("-smt2", "-in")
   // Assuming this does not change during runtime.
   proverPath = Paths.get(config.z3Exe)
-
-  protected def createInstance() = {
-    log.info(s"Starting Z3 at ${proverPath}")
-
-    val userProvidedZ3Args: Array[String] = config.z3Args.get match {
-      case None =>
-        Array()
-
-      case Some(args) =>
-        log.info(s"Additional command-line arguments are $args")
-        args.split(' ').map(_.trim)
-    }
-
-    val builder = new ProcessBuilder(proverPath.toFile.getPath +: "-smt2" +: "-in" +: userProvidedZ3Args :_*)
-    builder.redirectErrorStream(true)
-
-    val process = builder.start()
-
-    Runtime.getRuntime.addShutdownHook(new Thread {
-      override def run() {
-        process.destroy()
-      }
-    })
-    process
-  }
 
   def setTimeout(timeout: Int) {
     /* [2015-07-27 Malte] Setting the timeout unnecessarily often seems to
