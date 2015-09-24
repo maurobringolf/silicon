@@ -219,7 +219,7 @@ class Silicon(private var debugInfo: Seq[(String, Any)] = Nil)
 
     decider.start()
 
-    val preambleEmitter = new SMTLib2PreambleEmitter(decider.prover.asInstanceOf[Z3ProverStdIO])
+    val preambleEmitter = new SMTLib2PreambleEmitter(decider.prover)
     val sequencesEmitter = new DefaultSequencesEmitter(decider.prover, symbolConverter, preambleEmitter)
     val setsEmitter = new DefaultSetsEmitter(decider.prover, symbolConverter, preambleEmitter)
     val multisetsEmitter = new DefaultMultisetsEmitter(decider.prover, symbolConverter, preambleEmitter)
@@ -634,11 +634,11 @@ class Config(args: Seq[String]) extends SilFrontendConfig(args, "Silicon") {
     hidden = false
   )(forwardArgumentsConverter)
 
-  val z3ConfigArgs = opt[String]("z3ConfigArgs",
-    descr = (  "Configuration options which should be forwarded to Z3. "
+  val proverConfigArgs = opt[String]("proverConfigArgs",
+    descr = (  "Configuration options which should be forwarded to the prover. "
              + "The expected format is \"<key>=<val> <key>=<val> ... <key>=<val>\", "
              + "including the quotation marks. "
-             + "The configuration options given here will override those from Silicon's Z3 preamble."),
+             + "The configuration options given here will override those from Silicon's static preamble."),
     default = None,
     noshort = true,
     hidden = false

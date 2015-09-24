@@ -9,6 +9,9 @@ package silicon
 package decider
 
 import java.io.FileNotFoundException
+
+import viper.silicon.interfaces.decider.Prover
+
 import scala.io.Source
 import silver.components.StatefulComponent
 
@@ -25,7 +28,7 @@ trait PreambleFileEmitter[I, O] extends StatefulComponent {
 /* TODO: Decouple from prover. Ideally, only the decider should have a reference to the prover.
  *       Could closures be passed in that forward the work to the prover?
  */
-class SMTLib2PreambleEmitter(prover: Z3ProverStdIO) extends PreambleFileEmitter[String, String] {
+class SMTLib2PreambleEmitter(prover: Prover) extends PreambleFileEmitter[String, String] {
 
   /* Lifetime  */
 

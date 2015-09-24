@@ -23,6 +23,7 @@ class CVC4ProverStdIO(config: Config, bookkeeper: Bookkeeper) extends ProverStdI
   def startupArgs = CVC4ProverStdIO.startupArgs
   def minVersion = CVC4ProverStdIO.minVersion
   def maxVersion = CVC4ProverStdIO.maxVersion
+  def staticConfigResource = CVC4ProverStdIO.staticConfigResource
 
   def setTimeout(timeout: Int): Unit = {
     logComment(s"Setting the timeout ($timeout ms) interactively is not supported by CVC4")
@@ -36,4 +37,5 @@ object CVC4ProverStdIO {
 
   val minVersion = Version("1.5")
   val maxVersion = None
+  val staticConfigResource = "/cvc4config.smt2"
 }

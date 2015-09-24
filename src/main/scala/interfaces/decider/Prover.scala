@@ -32,10 +32,14 @@ trait Prover extends StatefulComponent {
   def declare(decl: Decl)
   def statistics(): Map[String, String]
   def proverRunStarts()
+  def write(string: String) // required for preamble emitter
+
+  // Static information about the current implementation
   def version: Version
   def minVersion: Version
   def maxVersion: Option[Version]
   def path: Path
   def name: String
   def exeEnvVar: String
+  def staticConfigResource: String
 }

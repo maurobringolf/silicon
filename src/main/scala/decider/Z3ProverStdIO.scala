@@ -24,6 +24,7 @@ class Z3ProverStdIO(config: Config, bookkeeper: Bookkeeper) extends ProverStdIO(
   def startupArgs = Z3ProverStdIO.startupArgs
   def minVersion = Z3ProverStdIO.minVersion
   def maxVersion = Z3ProverStdIO.maxVersion
+  def staticConfigResource = Z3ProverStdIO.staticConfigResource
 
   def setTimeout(timeout: Int) {
     /* [2015-07-27 Malte] Setting the timeout unnecessarily often seems to
@@ -47,4 +48,5 @@ object Z3ProverStdIO {
 
   val minVersion = Version("4.3.2")
   val maxVersion = None
+  val staticConfigResource = "/z3config.smt2"
 }
