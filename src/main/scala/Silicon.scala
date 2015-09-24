@@ -660,6 +660,13 @@ class Config(args: Seq[String]) extends SilFrontendConfig(args, "Silicon") {
     hidden = Silicon.hideInternalOptions
   )(assertionModeConverter)
 
+  val prover = opt[String]("prover",
+    descr = "Prover to use as backend for Silicon. Either 'Z3' or 'CVC4'.",
+    default = Some("Z3"),
+    noshort = true,
+    hidden = false
+  )
+
   /* Option validation */
 
   validateOpt(timeout) {

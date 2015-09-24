@@ -30,7 +30,7 @@ class DefaultDecider[ST <: Store[ST],
 
   private type C = DefaultContext
 
-  private var z3: Z3ProverStdIO = _
+  private var _prover: Prover = _
 
   protected var pathConditionsFactory: PathConditionsFactory[PC] = _
   protected var config: Config = _
@@ -56,7 +56,7 @@ class DefaultDecider[ST <: Store[ST],
 //  lazy val fcwpLog = common.io.PrintWriter(new java.io.File(config.tempDirectory(), "findChunkWithProver.txt"))
 
   @inline
-  def prover: Prover = z3
+  def prover: Prover = _prover
 
   @inline
   def π = pathConditions.values
@@ -85,14 +85,20 @@ class DefaultDecider[ST <: Store[ST],
   }
 
   private def createProver(): Option[DependencyNotFoundError] = {
+    config.prover().toUpperCase match {
+      case "Z3" => _prover = new Z3ProverStdIO(config, bookkeeper)
+      case "CVC4" => _prover = new CVC4ProverStdIO(config, bookkeeper)
+      case _ =>
+        log.warn(s"Unknown prover ${config.prover()}. Using Z3 as fallback.")
+        _prover =new Z3ProverStdIO(config, bookkeeper)
+    }
     try {
-      z3 = new Z3ProverStdIO(config, bookkeeper)
       prover.start()
     } catch {
       case e: java.io.IOException if e.getMessage.startsWith("Cannot run program") =>
         state = State.Erroneous
         val message = (
-          s"Could not execute Z3 at ${prover.path}. Either place z3 in the path, or set "
+          s"Could not execute ${prover.name} at ${prover.path}. Either place ${prover.name} in the path, or set "
             + s"the environment variable ${Silicon.z3ExeEnvironmentVariable}, or run "
             + s"Silicon with option --z3Exe")
 
@@ -100,13 +106,13 @@ class DefaultDecider[ST <: Store[ST],
     }
 
     val version = prover.version()
-    log.info(s"Using Z3 $version located at ${prover.path}")
+    log.info(s"Using ${prover.name} $version located at ${prover.path}")
 
     if (version < Silicon.z3MinVersion)
-      log.warn(s"Expected at least Z3 version ${Silicon.z3MinVersion.version}, but found $version")
+      log.warn(s"Expected at least ${prover.name} version ${Silicon.z3MinVersion.version}, but found $version")
 
     if (Silicon.z3MaxVersion.fold(false)(_ < version))
-      log.warn(  s"Silicon might not work with Z3 version $version, "
+      log.warn(  s"Silicon might not work with ${prover.name} version $version, "
           + s"consider using a version strictly older than ${Silicon.z3MaxVersion.get}")
 
     None

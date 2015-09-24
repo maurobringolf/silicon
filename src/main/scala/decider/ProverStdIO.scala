@@ -62,9 +62,8 @@ abstract class ProverStdIO(config: Config, bookkeeper: Bookkeeper) extends Prove
     process
   }
 
-
-
   def path() = proverPath
+  def name() = proverName
 
   def version(): Version = {
     val versionPattern = """\(?\s*:version\s+"(.*?)"\)?""".r
@@ -77,7 +76,7 @@ abstract class ProverStdIO(config: Config, bookkeeper: Bookkeeper) extends Prove
 
     line match {
       case versionPattern(v) => Version(v)
-      case _ => throw new ProverInteractionFailed(s"Unexpected output of Z3 while getting version: $line")
+      case _ => throw new ProverInteractionFailed(s"Unexpected output of $proverName while getting version: $line")
     }
   }
 
@@ -113,12 +112,12 @@ abstract class ProverStdIO(config: Config, bookkeeper: Bookkeeper) extends Prove
       output.close()
 
       process.destroy()
-      //      z3.waitFor() /* Makes the current thread wait until the process has been shut down */
+      //process.waitFor() /* Makes the current thread wait until the process has been shut down */
 
       val currentLogPath = config.proverLogFile
       if (logPath != currentLogPath) {
         /* This is a hack to make it possible to name the SMTLIB logfile after
-         * the input file that was verified. Currently, Silicon starts Z3 before
+         * the input file that was verified. Currently, Silicon starts the prover before
          * the input file name is known, which is partially due to our crappy
          * and complicated way of how command-line arguments are parsed and
          * how Silver programs are passed to verifiers.

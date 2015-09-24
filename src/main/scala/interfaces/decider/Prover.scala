@@ -34,4 +34,5 @@ trait Prover extends StatefulComponent {
   def proverRunStarts()
   def version(): Version
   def path(): Path
+  def name(): String
 }
