@@ -55,7 +55,7 @@ class TermToSMTLib2Converter(bookkeeper: Bookkeeper) extends PrettyPrinter with 
 
   protected def render(decl: Decl): Doc = decl match {
     case SortDecl(sort: Sort) =>
-      parens("declare-sort" <+> render(sort))
+      parens("declare-sort" <+> render(sort) <+> "0")
 
     case VarDecl(v: Var) =>
       parens("declare-const" <+> sanitizeSymbol(v.id) <+> render(v.sort))

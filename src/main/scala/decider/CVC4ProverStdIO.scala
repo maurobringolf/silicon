@@ -33,7 +33,7 @@ class CVC4ProverStdIO(config: Config, bookkeeper: Bookkeeper) extends ProverStdI
 object CVC4ProverStdIO {
   val name = "CVC4"
   val exeEnvVar = "CVC4_EXE"
-  val startupArgs = List("--lang=smt", "--quiet", "--incremental")
+  val startupArgs = List("--lang=smt", "--quiet", "--incremental", "--tlimit-per=10000")
 
   val minVersion = Version("1.5-prerelease")
   val maxVersion = None
