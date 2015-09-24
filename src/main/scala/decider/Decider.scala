@@ -86,11 +86,13 @@ class DefaultDecider[ST <: Store[ST],
 
   private def createProver(): Option[DependencyNotFoundError] = {
     config.prover().toUpperCase match {
-      case "Z3" => _prover = new Z3ProverStdIO(config, bookkeeper)
-      case "CVC4" => _prover = new CVC4ProverStdIO(config, bookkeeper)
+      case "Z3" =>
+        _prover = new Z3ProverStdIO(config, bookkeeper)
+      case "CVC4" =>
+        _prover = new CVC4ProverStdIO(config, bookkeeper)
       case _ =>
         log.warn(s"Unknown prover ${config.prover()}. Using Z3 as fallback.")
-        _prover =new Z3ProverStdIO(config, bookkeeper)
+        _prover = new Z3ProverStdIO(config, bookkeeper)
     }
     try {
       prover.start()
@@ -99,21 +101,21 @@ class DefaultDecider[ST <: Store[ST],
         state = State.Erroneous
         val message = (
           s"Could not execute ${prover.name} at ${prover.path}. Either place ${prover.name} in the path, or set "
-            + s"the environment variable ${Silicon.z3ExeEnvironmentVariable}, or run "
-            + s"Silicon with option --z3Exe")
+            + s"the environment variable ${prover.exeEnvVar}, or provide "
+            + s"the path as a command line argument.")
 
         return Some(DependencyNotFoundError(message))
     }
 
-    val version = prover.version()
+    val version = prover.version
     log.info(s"Using ${prover.name} $version located at ${prover.path}")
 
-    if (version < Silicon.z3MinVersion)
-      log.warn(s"Expected at least ${prover.name} version ${Silicon.z3MinVersion.version}, but found $version")
+    if (version < prover.minVersion)
+      log.warn(s"Expected at least ${prover.name} version ${prover.minVersion.version}, but found $version")
 
-    if (Silicon.z3MaxVersion.fold(false)(_ < version))
+    if (prover.maxVersion.fold(false)(_ < version))
       log.warn(  s"Silicon might not work with ${prover.name} version $version, "
-          + s"consider using a version strictly older than ${Silicon.z3MaxVersion.get}")
+          + s"consider using a version strictly older than ${prover.maxVersion.get}")
 
     None
   }

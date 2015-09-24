@@ -32,6 +32,7 @@ import viper.silicon.decider.{Z3ProverStdIO, SMTLib2PreambleEmitter, DefaultDeci
 import reporting.{VerificationException, Bookkeeper}
 import supporters.{DefaultSetsEmitter, DefaultDomainsEmitter, DefaultDomainsTranslator, DefaultMultisetsEmitter,
     DefaultSequencesEmitter}
+import decider.{Z3ProverStdIO, CVC4ProverStdIO}
 
 object Silicon {
   private val brandingDataObjectName = "viper.silicon.brandingData"
@@ -62,11 +63,10 @@ object Silicon {
   val version = s"$sbtProjectVersion (${hgid.version})"
   val buildVersion = s"$sbtProjectVersion ${hgid.version} ${hgid.branch} $buildDate"
   val copyright = "(c) Copyright ETH Zurich 2012 - 2015"
-  val z3ExeEnvironmentVariable = "Z3_EXE"
-  val cvc4ExeEnvironmentVariable = "CVC4_EXE"
-  val z3MinVersion = Version("4.3.2")
-  val z3MaxVersion: Option[Version] = None
-  val dependencies = Seq(SilDefaultDependency("Z3", z3MinVersion.version, "http://z3.codeplex.com/"))
+
+  val dependencies = Seq(
+    SilDefaultDependency(Z3ProverStdIO.name, Z3ProverStdIO.minVersion.version, "http://z3.codeplex.com/"),
+    SilDefaultDependency(CVC4ProverStdIO.name, CVC4ProverStdIO.minVersion.version, "http://cvc4.cs.nyu.edu/"))
 
   val hideInternalOptions = true
 
@@ -570,7 +570,7 @@ class Config(args: Seq[String]) extends SilFrontendConfig(args, "Silicon") {
 
   private val rawZ3Exe = opt[String]("z3Exe",
     descr = (  "Z3 executable. The environment variable %s can also "
-             + "be used to specify the path of the executable.").format(Silicon.z3ExeEnvironmentVariable),
+             + "be used to specify the path of the executable.").format(Z3ProverStdIO.exeEnvVar),
     default = None,
     noshort = true,
     hidden = false
@@ -578,7 +578,7 @@ class Config(args: Seq[String]) extends SilFrontendConfig(args, "Silicon") {
 
   private val rawCVC4Exe = opt[String]("cvc4Exe",
     descr = (  "CVC4 executable. The environment variable %s can also "
-      + "be used to specify the path of the executable.").format(Silicon.cvc4ExeEnvironmentVariable),
+      + "be used to specify the path of the executable.").format(CVC4ProverStdIO.exeEnvVar),
     default = None,
     noshort = true,
     hidden = false
@@ -587,14 +587,14 @@ class Config(args: Seq[String]) extends SilFrontendConfig(args, "Silicon") {
   lazy val z3Exe: String = {
     val isWindows = System.getProperty("os.name").toLowerCase.startsWith("windows")
 
-    rawZ3Exe.get.getOrElse(envOrNone(Silicon.z3ExeEnvironmentVariable)
+    rawZ3Exe.get.getOrElse(envOrNone(Z3ProverStdIO.exeEnvVar)
                 .getOrElse("z3" + (if (isWindows) ".exe" else "")))
   }
 
   lazy val cvc4Exe: String = {
     val isWindows = System.getProperty("os.name").toLowerCase.startsWith("windows")
 
-    rawCVC4Exe.get.getOrElse(envOrNone(Silicon.cvc4ExeEnvironmentVariable)
+    rawCVC4Exe.get.getOrElse(envOrNone(CVC4ProverStdIO.exeEnvVar)
       .getOrElse("cvc4" + (if (isWindows) ".exe" else "")))
   }
 

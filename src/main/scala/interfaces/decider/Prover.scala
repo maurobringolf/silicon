@@ -32,7 +32,10 @@ trait Prover extends StatefulComponent {
   def declare(decl: Decl)
   def statistics(): Map[String, String]
   def proverRunStarts()
-  def version(): Version
-  def path(): Path
-  def name(): String
+  def version: Version
+  def minVersion: Version
+  def maxVersion: Option[Version]
+  def path: Path
+  def name: String
+  def exeEnvVar: String
 }

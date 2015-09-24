@@ -24,21 +24,19 @@ abstract class ProverStdIO(config: Config, bookkeeper: Bookkeeper) extends Prove
   val termConverter = new TermToSMTLib2Converter(bookkeeper)
   import termConverter._
 
-  protected var proverName :String = _
-  protected var startupArgs :List[String] = _
   protected var pushPopScopeDepth = 0
   protected var isLoggingCommentsEnabled: Boolean = true
   protected var logFile: PrintWriter = _
   protected var process: Process = _
   protected var input: BufferedReader = _
   protected var output: PrintWriter = _
-  protected var proverPath: Path = _
   protected var logPath: Path = _
   protected var counter: Counter = _
   protected var lastTimeout: Int = 0
 
+  protected def startupArgs :List[String]
   protected def createInstance() = {
-    log.info(s"Starting $proverName at ${proverPath}")
+    log.info(s"Starting $name at $path")
 
     val userProvidedArgs: List[String] = config.proverArgs.get match {
       case None =>
@@ -48,7 +46,7 @@ abstract class ProverStdIO(config: Config, bookkeeper: Bookkeeper) extends Prove
         log.info(s"Additional command-line arguments are $args")
         args.split(' ').map(_.trim).toList
     }
-    val builder = new ProcessBuilder(proverPath.toFile.getPath :: startupArgs ::: userProvidedArgs :_*)
+    val builder = new ProcessBuilder(path.toFile.getPath :: startupArgs ::: userProvidedArgs :_*)
     builder.redirectErrorStream(true)
 
     val process = builder.start()
@@ -62,9 +60,6 @@ abstract class ProverStdIO(config: Config, bookkeeper: Bookkeeper) extends Prove
     process
   }
 
-  def path() = proverPath
-  def name() = proverName
-
   def version(): Version = {
     val versionPattern = """\(?\s*:version\s+"(.*?)"\)?""".r
     var line = ""
@@ -76,7 +71,7 @@ abstract class ProverStdIO(config: Config, bookkeeper: Bookkeeper) extends Prove
 
     line match {
       case versionPattern(v) => Version(v)
-      case _ => throw new ProverInteractionFailed(s"Unexpected output of $proverName while getting version: $line")
+      case _ => throw new ProverInteractionFailed(s"Unexpected output of $name while getting version: $line")
     }
   }
 
@@ -248,7 +243,7 @@ abstract class ProverStdIO(config: Config, bookkeeper: Bookkeeper) extends Prove
 
       /* Check that the first line starts with "(:". */
       if (line.isEmpty && !line.startsWith("(:"))
-        throw new ProverInteractionFailed(s"Unexpected output of $proverName while reading statistics: $line")
+        throw new ProverInteractionFailed(s"Unexpected output of $name while reading statistics: $line")
 
       line match {
         case entryPattern(entryName, entryNumber) =>
@@ -314,7 +309,7 @@ abstract class ProverStdIO(config: Config, bookkeeper: Bookkeeper) extends Prove
     val answer = readLine()
 
     if (answer != "success")
-      throw new ProverInteractionFailed(s"Unexpected output of $proverName. Expected 'success' but found: $answer")
+      throw new ProverInteractionFailed(s"Unexpected output of $name. Expected 'success' but found: $answer")
   }
 
   protected def readUnsat(): Boolean = readLine() match {
@@ -323,7 +318,7 @@ abstract class ProverStdIO(config: Config, bookkeeper: Bookkeeper) extends Prove
     case "unknown" => false
 
     case result =>
-      throw new ProverInteractionFailed(s"Unexpected output of $proverName while trying to refute an assertion: $result")
+      throw new ProverInteractionFailed(s"Unexpected output of $name while trying to refute an assertion: $result")
   }
 
   protected def readLine(): String = {
@@ -335,7 +330,7 @@ abstract class ProverStdIO(config: Config, bookkeeper: Bookkeeper) extends Prove
       if (result.toLowerCase != "success") logComment(result)
 
       val warning = result.startsWith("WARNING")
-      if (warning) log.info(s"$proverName: $result")
+      if (warning) log.info(s"$name: $result")
 
       repeat = warning
     }
