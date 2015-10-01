@@ -230,8 +230,8 @@
   :pattern ( ($Seq.drop ($Seq.drop s m) n))
   )))
 (assert (forall ((x $S$) (y $S$)) (!
-  (iff
+  (not (xor
     ($Seq.contains ($Seq.singleton x) y)
-    (= x y))
+    (= x y)))
   :pattern (($Seq.contains ($Seq.singleton x) y))
   )))
