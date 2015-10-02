@@ -102,15 +102,18 @@ class TermToSMTLib2Converter(bookkeeper: Bookkeeper) extends PrettyPrinter with 
       val docQuant = render(quant)
 
       val docTriggers =
-        ssep((triggers.map(trigger => ssep((trigger.p map render).to[collection.immutable.Seq], space))
-                     .map(d => ":pattern" <+> parens(d))).to[collection.immutable.Seq],
+        ssep(triggers.map(trigger => ssep((trigger.p map render).to[collection.immutable.Seq], space))
+                     .map(d => ":pattern" <+> parens(d)).to[collection.immutable.Seq],
              line)
 
       val docQid: Doc =
         if (name.isEmpty) empty
         else s":qid |$name|"
-
-      parens(docQuant <+> parens(docVars) <+> parens("!" <> nest(line <> docBody <> line <> docTriggers <> line <> docQid)))
+      
+      if (!(name.isEmpty && triggers.isEmpty))
+        parens(docQuant <+> parens(docVars) <+> parens("!" <> nest(line <> docBody <> line <> docTriggers <> line <> docQid)))
+      else
+        parens(docQuant <+> parens(docVars) <+> docBody)
 
     /* Booleans */
 
