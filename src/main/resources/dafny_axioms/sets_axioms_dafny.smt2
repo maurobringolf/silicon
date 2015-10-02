@@ -25,7 +25,7 @@
     (not (xor
       (= ($Set.card s) 0)
       (= s $Set.empty<$S$>)))
-    (implies
+    (=>
       (not (= ($Set.card s) 0))
       (exists ((x $S$)) (!
         ($Set.in x s)
