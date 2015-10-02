@@ -22,9 +22,9 @@
 
 (assert (forall ((s $Set<$S$>)) (!
   (and
-    (iff
+    (not (xor
       (= ($Set.card s) 0)
-      (= s $Set.empty<$S$>))
+      (= s $Set.empty<$S$>)))
     (implies
       (not (= ($Set.card s) 0))
       (exists ((x $S$)) (!
@@ -41,9 +41,9 @@
   )))
 
 (assert (forall ((r $S$) (o $S$)) (!
-  (iff
+  (not (xor
     ($Set.in o ($Set.singleton r))
-    (= r o))
+    (= r o)))
   :pattern (($Set.in o ($Set.singleton r)))
   )))
 
@@ -53,11 +53,11 @@
   )))
 
 (assert (forall ((a $Set<$S$>) (x $S$) (o $S$)) (!
-  (iff
+  (not (xor
     ($Set.in o ($Set.unionone a x))
     (or
       (= o x)
-      ($Set.in o a)))
+      ($Set.in o a))))
   :pattern (($Set.in o ($Set.unionone a x)))
   )))
 
@@ -90,11 +90,11 @@
   )))
 
 (assert (forall ((a $Set<$S$>) (b $Set<$S$>) (o $S$)) (!
-  (iff
+  (not (xor
     ($Set.in o ($Set.union a b))
     (or
       ($Set.in o a)
-      ($Set.in o b)))
+      ($Set.in o b))))
   :pattern (($Set.in o ($Set.union a b)))
   )))
 
@@ -125,11 +125,11 @@
   ; )))
 
 (assert (forall ((a $Set<$S$>) (b $Set<$S$>) (o $S$)) (!
-  (iff
+  (not (xor
     ($Set.in o ($Set.intersection a b))
     (and
       ($Set.in o a)
-      ($Set.in o b)))
+      ($Set.in o b))))
   :pattern (($Set.in o ($Set.intersection a b)))
   )))
 
@@ -174,11 +174,11 @@
   )))
 
 (assert (forall ((a $Set<$S$>) (b $Set<$S$>) (o $S$)) (!
-  (iff
+  (not (xor
     ($Set.in o ($Set.difference a b))
     (and
       ($Set.in o a)
-      (not ($Set.in o b))))
+      (not ($Set.in o b)))))
   :pattern (($Set.in o ($Set.difference a b)))
   )))
 
@@ -191,7 +191,7 @@
   )))
 
 (assert (forall ((a $Set<$S$>) (b $Set<$S$>)) (!
-  (iff
+  (not (xor
     ($Set.subset a b)
     (forall ((o $S$)) (!
       (=>
@@ -199,21 +199,21 @@
         ($Set.in o b))
       :pattern (($Set.in o a))
       :pattern (($Set.in o b))
-    )))
+    ))))
   :pattern (($Set.subset a b))
   )))
 
 (assert (forall ((a $Set<$S$>) (b $Set<$S$>)) (!
-  (iff
+  (not (xor
     ($Set.equal a b)
     (forall ((o $S$)) (!
-      (iff
+      (not (xor
         ($Set.in o a)
-        ($Set.in o b))
+        ($Set.in o b)))
       :pattern (($Set.in o a))
       :pattern (($Set.in o b))
       :qid |$Set<$S$>.ext-inner|
-      )))
+      ))))
   :pattern (($Set.equal a b))
   :qid |$Set<$S$>.ext-outer|
   )))
@@ -226,7 +226,7 @@
   )))
 
 (assert (forall ((a $Set<$S$>) (b $Set<$S$>)) (!
-  (iff
+  (not (xor
     ($Set.disjoint a b)
     (forall ((o $S$)) (!
       (or
@@ -234,7 +234,7 @@
         (not ($Set.in o b)))
       :pattern (($Set.in o a))
       :pattern (($Set.in o b))
-      )))
+      ))))
   :pattern (($Set.disjoint a b))
   )))
 
