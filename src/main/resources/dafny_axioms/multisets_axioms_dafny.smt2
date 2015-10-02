@@ -26,8 +26,8 @@
 (assert (forall ((s $Multiset<$S$>) ) (! (and
   (=> (= ($Multiset.card s) 0) (= s $Multiset.empty<$S$>))
   (=> (= s $Multiset.empty<$S$>) (= ($Multiset.card s) 0))
-  (=> (not (= ($Multiset.card s) 0)) (exists ((x $S$) ) (! (< 0 ($Multiset.count s x))
-  ))))
+  (=> (not (= ($Multiset.card s) 0)) (exists ((x $S$) ) (< 0 ($Multiset.count s x))
+  )))
   :pattern ( ($Multiset.card s))
   )))
 (assert (forall ((r $S$) (o $S$) ) (! (and
