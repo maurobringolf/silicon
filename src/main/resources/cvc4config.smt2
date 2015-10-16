@@ -7,5 +7,4 @@
 ;            or more than one space.
 
 (set-option :print-success true)
-(set-option :produce-models true) ; if model is required
-(set-logic ALL_SUPPORTED) ; for now, required logic fragment will checked later
+(set-logic AUFBVFPDTSNIRAFS) ; for now, required logic fragment will checked later
