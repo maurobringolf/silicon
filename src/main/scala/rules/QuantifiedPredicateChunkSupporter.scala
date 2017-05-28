@@ -256,7 +256,7 @@ object quantifiedPredicateChunkSupporter extends QuantifiedPredicateChunkSupport
 
     v.decider.assert(PermLess(NoPerm(), permission(h, args, predicate))) {
       case false =>
-        Failure(pve dueTo InsufficientPermission(locacc))
+        failure(pve dueTo InsufficientPermission(locacc), v)
 
       case true =>
         val (quantifiedChunks, _) = splitHeap(h, predicate.name)

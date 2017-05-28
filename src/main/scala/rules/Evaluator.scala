@@ -7,7 +7,7 @@
 package viper.silicon.rules
 
 import viper.silver.ast
-import viper.silver.verifier.PartialVerificationError
+import viper.silver.verifier.{PartialVerificationError, VerificationError}
 import viper.silver.verifier.errors.PreconditionInAppFalse
 import viper.silver.verifier.reasons._
 import viper.silicon.{EvaluateRecord, Map, SymbExLogger, TriggerSets}
@@ -178,7 +178,7 @@ object evaluator extends EvaluationRules with Immutable {
                */
               v1.decider.assert(PermLess(NoPerm(), fvfDef.totalPermissions(tRcvr))) {
                 case false =>
-                  Failure(pve dueTo InsufficientPermission(fa))
+                  failure(pve dueTo InsufficientPermission(fa), v1)
                 case true =>
                   v1.decider.assume(fvfDef.quantifiedValueDefinitions)
                     /* Re-emit definition since the previous definition could be nested under
@@ -220,7 +220,7 @@ object evaluator extends EvaluationRules with Immutable {
       case old @ ast.LabelledOld(e0, lbl) =>
         s.oldHeaps.get(lbl) match {
           case None =>
-            Failure(pve dueTo LabelledStateNotReached(old))
+            failure(pve dueTo LabelledStateNotReached(old), null)
           case Some(h) =>
             evalOld(s, h, e0, pve, v)(Q)}
 
@@ -560,7 +560,7 @@ object evaluator extends EvaluationRules with Immutable {
                         eval(s9, eIn, pve, v5)(QB)})})
                   })(join(v2.symbolConverter.toSort(eIn.typ), "joinedIn", s2.quantifiedVariables, v2))(Q)
                 case false =>
-                  Failure(pve dueTo NegativePermission(ePerm))}))
+                  failure(pve dueTo NegativePermission(ePerm), v2)}))
         } else {
           val unknownValue = v.decider.appliedFresh("recunf", v.symbolConverter.toSort(eIn.typ), s.quantifiedVariables)
           Q(s, unknownValue, v)
@@ -579,9 +579,9 @@ object evaluator extends EvaluationRules with Immutable {
                 case true =>
                   Q(s1, SeqAt(t0, t1), v1)
                 case false =>
-                  Failure(pve dueTo SeqIndexExceedsLength(e0, e1))}
+                  failure(pve dueTo SeqIndexExceedsLength(e0, e1), v1)}
             case false =>
-              Failure(pve dueTo SeqIndexNegative(e0, e1))
+              failure(pve dueTo SeqIndexNegative(e0, e1), v1)
           }})
 
       case ast.SeqAppend(e0, e1) => evalBinOp(s, e0, e1, SeqAppend, pve, v)(Q)
@@ -667,7 +667,7 @@ object evaluator extends EvaluationRules with Immutable {
       /* Unexpected nodes */
 
       case _: ast.InhaleExhaleExp =>
-        Failure(viper.silicon.utils.consistency.createUnexpectedInhaleExhaleExpressionError(e))
+        failure(viper.silicon.utils.consistency.createUnexpectedInhaleExhaleExpressionError(e), null)
     }
 
     resultTerm
@@ -797,7 +797,7 @@ object evaluator extends EvaluationRules with Immutable {
 
     v.decider.assert(tDivisor !== tZero){
       case true => Q(s, t, v)
-      case false => Failure(pve dueTo DivisionByZero(eDivisor))
+      case false => failure(pve dueTo DivisionByZero(eDivisor), v)
     }
   }
 

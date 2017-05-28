@@ -189,7 +189,7 @@ object chunkSupporter extends ChunkSupportRules with Immutable {
           if (v1.decider.checkSmoke())
             Success() /* TODO: Mark branch as dead? */
           else
-            Failure(pve dueTo InsufficientPermission(locacc)).withLoad(args)}
+            failure(pve dueTo InsufficientPermission(locacc), v1, true).withLoad(args)}
     )(Q)
   }
 
@@ -221,7 +221,7 @@ object chunkSupporter extends ChunkSupportRules with Immutable {
             v2.decider.assume(permCheck)
             QS(s2.copy(h = s.h), h2, ch, v2)
           case false =>
-            Failure(pve dueTo InsufficientPermission(locacc)).withLoad(args)
+            failure(pve dueTo InsufficientPermission(locacc), v2).withLoad(args)
         }
       })
     )(Q)

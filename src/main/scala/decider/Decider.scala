@@ -37,6 +37,7 @@ trait Decider {
   def setPathConditionMark(): Mark
 
   def assume(t: Term)
+  def getModel(): String
   def assume(ts: InsertionOrderedSet[Term], enforceAssumption: Boolean = false)
   def assume(ts: Iterable[Term])
 
@@ -48,6 +49,7 @@ trait Decider {
    */
   def assert(t: Term, timeout: Option[Int] = None)(Q:  Boolean => VerificationResult): VerificationResult
 
+  def generateModel()
   def fresh(id: String, sort: Sort): Var
   def fresh(id: String, argSorts: Seq[Sort], resultSort: Sort): Function
   def freshMacro(id: String, formalArgs: Seq[Var], body: Term): Macro
@@ -194,6 +196,10 @@ trait DefaultDeciderProvider extends VerifierComponent { this: Verifier =>
 
     def check(t: Term, timeout: Int) = deciderAssert(t, Some(timeout))
 
+    def generateModel(): Unit = {
+      proverAssert(False(), None)
+    }
+
     def assert(t: Term, timeout: Option[Int] = None)(Q: Boolean => VerificationResult) = {
       val success = deciderAssert(t, timeout)
 
@@ -218,6 +224,10 @@ trait DefaultDeciderProvider extends VerifierComponent { this: Verifier =>
       val result = prover.assert(t, timeout)
 
       result
+    }
+
+    def getModel(): String ={
+      prover.getLastModel()
     }
 
     /* Fresh symbols */

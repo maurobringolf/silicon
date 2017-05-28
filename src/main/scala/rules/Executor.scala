@@ -269,7 +269,7 @@ object executor extends ExecutionRules with Immutable {
                 val ch = quantifiedChunkSupporter.createSingletonQuantifiedChunk(tRcvr, field.name, fvf, FullPerm())
                 Q(s3.copy(h = h3 + ch), v2)
               case None =>
-                Failure(pve dueTo InsufficientPermission(fa))}}))
+                failure(pve dueTo InsufficientPermission(fa), v2, true)}}))
 
       case ass @ ast.FieldAssign(fa @ ast.FieldAccess(eRcvr, field), rhs) =>
         val pve = AssignmentFailed(ass)
@@ -343,7 +343,7 @@ object executor extends ExecutionRules with Immutable {
               if (v1.decider.checkSmoke())
                 QS(s1, v1)
               else
-                Failure(pve dueTo AssertionFalse(a))
+                failure(pve dueTo AssertionFalse(a), v1)
               })((_, _) => Success())
 
           case _ =>
@@ -393,7 +393,7 @@ object executor extends ExecutionRules with Immutable {
                   //handles both quantified and unquantified predicates
                   predicateSupporter.fold(s2, predicate, tArgs, tPerm, pve, v2)(Q)
                 case false =>
-                  Failure(pve dueTo NegativePermission(ePerm))}))
+                  failure(pve dueTo NegativePermission(ePerm), v2)}))
 
       case unfold @ ast.Unfold(ast.PredicateAccessPredicate(pa @ ast.PredicateAccess(eArgs, predicateName), ePerm)) =>
         val predicate = Verifier.program.findPredicate(predicateName)
@@ -405,7 +405,7 @@ object executor extends ExecutionRules with Immutable {
                 //handles both quantified and unquantified predicates
                 predicateSupporter.unfold(s2, predicate, tArgs, tPerm, pve, v2, pa)(Q)
               case false =>
-                Failure(pve dueTo NegativePermission(ePerm))}))
+                failure(pve dueTo NegativePermission(ePerm), v2)}))
 
       case pckg @ ast.Package(wand) =>
         val pve = PackageFailed(pckg)
@@ -454,7 +454,7 @@ object executor extends ExecutionRules with Immutable {
               case Some(ch) =>
                 QL(s.copy(h = s.h - ch), Store(chWand.bindings), chWand.ghostFreeWand, v)
               case None =>
-                Failure(pve dueTo NamedMagicWandChunkNotFound(x))}
+                failure(pve dueTo NamedMagicWandChunkNotFound(x), v, true)}
 
           case _ => sys.error(s"Expected a magic wand, but found node $e")}
 

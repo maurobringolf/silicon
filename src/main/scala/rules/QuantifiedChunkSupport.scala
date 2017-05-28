@@ -264,7 +264,7 @@ object quantifiedChunkSupporter extends QuantifiedChunkSupport with Immutable {
 
     v.decider.assert(PermLess(NoPerm(), permission(h, receiver, field))) {
       case false =>
-        Failure(pve dueTo InsufficientPermission(locacc))
+        failure(pve dueTo InsufficientPermission(locacc), v)
 
       case true =>
         val (quantifiedChunks, _) = splitHeap(h, field.name)

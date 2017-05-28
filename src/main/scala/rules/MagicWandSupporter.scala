@@ -173,7 +173,7 @@ object magicWandSupporter extends SymbolicExecutionRules with Immutable {
 
       Q(sCurr, visitedHeaps.reverse ++ heapsToVisit, consumedChunks, vCurr)
     } else
-      Failure(pve dueTo InsufficientPermission(locacc)).withLoad(args)
+      failure(pve dueTo InsufficientPermission(locacc), vCurr).withLoad(args)
   }
 
   /* TODO: This is similar, but not as general, as the consumption algorithm
@@ -535,9 +535,9 @@ object magicWandSupporter extends SymbolicExecutionRules with Immutable {
                                  exhaleExt = true)
                 QI(s6, Heap(), v4)})})})
         else
-          Failure(pve dueTo NegativePermission(ePerm)))
+          failure(pve dueTo NegativePermission(ePerm), v1))
     } else {
-      Failure(pve dueTo InternalReason(acc, "Too many nested unfolding ghost operations."))
+      failure(pve dueTo InternalReason(acc, "Too many nested unfolding ghost operations."), v, true)
     }
   }
 
@@ -559,9 +559,9 @@ object magicWandSupporter extends SymbolicExecutionRules with Immutable {
                                .copy(h = Heap())
                 QI(s4, Heap(), v3)})
           case false =>
-            Failure(pve dueTo NegativePermission(ePerm))}))
+            failure(pve dueTo NegativePermission(ePerm), v2)}))
     } else
-      Failure(pve dueTo InternalReason(acc, "Too many nested folding ghost operations."))
+      failure(pve dueTo InternalReason(acc, "Too many nested folding ghost operations."), v, true)
   }
 
   def foldingPredicate(s: State,

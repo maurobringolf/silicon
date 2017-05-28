@@ -118,7 +118,7 @@ object predicateSupporter extends PredicateSupportRules with Immutable {
             v1.decider.assume(App(Verifier.predicateData(predicate).triggerFunction, snap.convert(terms.sorts.Snap) +: tArgs))
             Q(s4.copy(g = s.g), v1)})
 
-        case None => Failure(pve dueTo InsufficientPermission(pa))
+        case None => failure(pve dueTo InsufficientPermission(pa), v, true)
       }
     } else {
       /*

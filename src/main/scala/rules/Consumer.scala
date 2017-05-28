@@ -256,11 +256,11 @@ object consumer extends ConsumptionRules with Immutable {
                                          partiallyConsumedHeap = Some(h2))
                         Q(s3, h2, ch.fvf.convert(sorts.Snap), v1)
                       case None =>
-                        Failure(pve dueTo InsufficientPermission(fa))}
+                        failure(pve dueTo InsufficientPermission(fa), v1, true)}
                   case false =>
-                    Failure(pve dueTo ReceiverNotInjective(fa))}
+                    failure(pve dueTo ReceiverNotInjective(fa), v1)}
               case false =>
-                Failure(pve dueTo NegativePermission(perm))}}
+                failure(pve dueTo NegativePermission(perm), v1)}}
 
       case ast.utility.QuantifiedPermissions.QPPForall(qvar, cond, args, predname, loss, forall, predAccPred) =>
         val predicate = Verifier.program.findPredicate(predname)
@@ -297,11 +297,11 @@ object consumer extends ConsumptionRules with Immutable {
                         val s3 = s2.copy(functionRecorder = fr3, partiallyConsumedHeap = Some(h2))
                         Q(s3, h2, ch.psf.convert(sorts.Snap), v1)
                       case None =>
-                        Failure(pve dueTo InsufficientPermission(predAccPred.loc))}
+                        failure(pve dueTo InsufficientPermission(predAccPred.loc), v1, true)}
                   case false =>
-                    Failure(pve dueTo ReceiverNotInjective(predAccPred.loc))}
+                    failure(pve dueTo ReceiverNotInjective(predAccPred.loc), v1)}
               case false =>
-                Failure(pve dueTo NegativePermission(loss))}}
+                failure(pve dueTo NegativePermission(loss), v1)}}
 
       case ast.AccessPredicate(fa @ ast.FieldAccess(eRcvr, field), perm)
               if s.qpFields.contains(field) =>
@@ -319,7 +319,7 @@ object consumer extends ConsumptionRules with Immutable {
                 val s4 = s3.copy(partiallyConsumedHeap = Some(h3),
                                  functionRecorder = fr4)
                 Q(s4, h3, ch.valueAt(tRcvr), v2)
-              case None => Failure(pve dueTo InsufficientPermission(fa))}}))
+              case None => failure(pve dueTo InsufficientPermission(fa), v2, true)}}))
 
       case ast.AccessPredicate(pa @ ast.PredicateAccess(eArgs, predname), perm)
               if s.qpPredicates.contains(Verifier.program.findPredicate(predname)) =>
@@ -340,7 +340,7 @@ object consumer extends ConsumptionRules with Immutable {
                 val s4 = s3.copy(partiallyConsumedHeap = Some(h3),
                                  functionRecorder = fr4)
                 Q(s4, h3, ch.valueAt(tArgs), v2)
-              case None => Failure(pve dueTo InsufficientPermission(pa))}}))
+              case None => failure(pve dueTo InsufficientPermission(pa), v2, true)}}))
 
       case let: ast.Let if !let.isPure =>
         letSupporter.handle[ast.Exp](s, let, pve, v)((s1, g1, body, v1) => {
@@ -362,10 +362,10 @@ object consumer extends ConsumptionRules with Immutable {
                   val s4 = s3.copy(partiallyConsumedHeap = Some(h1))
                   Q(s4, h1, snap1, v3)})
               case false =>
-                Failure(pve dueTo NegativePermission(perm))}))
+                failure(pve dueTo NegativePermission(perm), v2)}))
 
       case _: ast.InhaleExhaleExp =>
-        Failure(viper.silicon.utils.consistency.createUnexpectedInhaleExhaleExpressionError(a))
+        failure(viper.silicon.utils.consistency.createUnexpectedInhaleExhaleExpressionError(a), null)
 
       /* Handle wands or wand-typed variables */
       case _ if a.typ == ast.Wand && magicWandSupporter.isDirectWand(a) =>
@@ -399,7 +399,7 @@ object consumer extends ConsumptionRules with Immutable {
                   QS(s2, hs2.head, v2.decider.fresh(sorts.Snap), v2)
                 }
 
-              case _ => Failure(ve)}
+              case _ => failure(ve, v1, true)}
           })(Q)
         }
 
@@ -500,7 +500,7 @@ object consumer extends ConsumptionRules with Immutable {
             v2.decider.assume(t)
             QS(s3, v2)
           case false =>
-            Failure(pve dueTo AssertionFalse(e))})
+            failure(pve dueTo AssertionFalse(e), v2)})
     })((s4, v4) => {
       val s5 = s4.copy(h = s.h,
                        reserveHeaps = s.reserveHeaps,

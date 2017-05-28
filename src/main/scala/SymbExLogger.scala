@@ -83,6 +83,16 @@ import viper.silicon.state.terms._
  */
 
 object SymbExLogger {
+  def printError(error: String, model: String): Unit ={
+    if (!printedErrors.contains((error, model))){
+      println(error)
+      println(model)
+      printedErrors = printedErrors ++ List((error, model))
+    }
+  }
+
+  var printedErrors = List[(String, String)]()
+
   /** List of logged Method/Predicates/Functions. **/
   var memberList = List[SymbLog]()
 

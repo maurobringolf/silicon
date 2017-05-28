@@ -33,6 +33,7 @@ class Z3ProverStdIO(uniqueId: String,
   private var input: BufferedReader = _
   private var output: PrintWriter = _
   /* private */ var z3Path: Path = _
+  private var lastModel: String = ""
 
   def z3Version(): Version = {
     val versionPattern = """\(?\s*:version\s+"(.*?)"\)?""".r
@@ -195,9 +196,12 @@ class Z3ProverStdIO(uniqueId: String,
   private def getModel(): Unit = {
     if (Verifier.config.ideModeAdvanced()) {
       writeLine("(get-model)")
-      val model = readModel().trim()
-      println(model + "\r\n")
+      lastModel = readModel().trim()
     }
+  }
+
+  def getLastModel() = {
+    lastModel
   }
 
   private def assertUsingSoftConstraints(goal: String): (Boolean, Long) = {
