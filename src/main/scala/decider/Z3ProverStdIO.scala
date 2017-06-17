@@ -9,12 +9,11 @@ package viper.silicon.decider
 import java.io.{BufferedReader, BufferedWriter, InputStreamReader, OutputStreamWriter, PrintWriter}
 import java.nio.file.{Path, Paths}
 import java.util.concurrent.TimeUnit
-
 import com.typesafe.scalalogging.LazyLogging
 import viper.silicon.{Config, Map, toMap}
 import viper.silicon.common.config.Version
 import viper.silicon.interfaces.decider.{Prover, Sat, Unknown, Unsat}
-import viper.silicon.reporting.Z3InteractionFailed
+import viper.silicon.reporting.{ExternalToolError, Z3InteractionFailed}
 import viper.silicon.state.IdentifierFactory
 import viper.silicon.state.terms._
 import viper.silicon.supporters.QuantifierSupporter
@@ -55,25 +54,32 @@ class Z3ProverStdIO(uniqueId: String,
     lastTimeout = -1
     logfileWriter = viper.silver.utility.Common.PrintWriter(Verifier.config.z3LogFile(uniqueId).toFile)
     z3Path = Paths.get(Verifier.config.z3Exe)
-    termConverter.start()
     z3 = createZ3Instance()
     input = new BufferedReader(new InputStreamReader(z3.getInputStream))
     output = new PrintWriter(new BufferedWriter(new OutputStreamWriter(z3.getOutputStream)), true)
   }
 
   private def createZ3Instance() = {
-    logger.info(s"Starting Z3 at $z3Path")
+    logger.debug(s"Starting Z3 at location '$z3Path'")
+
+    val z3File = z3Path.toFile
+
+    if (!z3File.isFile)
+      throw ExternalToolError("Z3", s"Cannot run Z3 at location '$z3File': not a file.")
+
+    if (!z3File.canExecute)
+      throw ExternalToolError("Z3", s"Cannot run Z3 at location '$z3File': file is not executable.")
 
     val userProvidedZ3Args: Array[String] = Verifier.config.z3Args.toOption match {
       case None =>
         Array()
 
       case Some(args) =>
-        logger.info(s"Additional command-line arguments are $args")
+        logger.debug(s"Additional command-line arguments are $args")
         args.split(' ').map(_.trim)
     }
 
-    val builder = new ProcessBuilder(z3Path.toFile.getPath +: "-smt2" +: "-in" +: userProvidedZ3Args :_*)
+    val builder = new ProcessBuilder(z3File.getPath +: "-smt2" +: "-in" +: userProvidedZ3Args :_*)
     builder.redirectErrorStream(true)
 
     val process = builder.start()
@@ -94,17 +100,24 @@ class Z3ProverStdIO(uniqueId: String,
 
   def stop() {
     this.synchronized {
-      logfileWriter.flush()
-      output.flush()
+      if (logfileWriter != null) {
+        logfileWriter.flush()
+        logfileWriter.close()
+      }
 
-      logfileWriter.close()
-      input.close()
-      output.close()
+      if (output != null) {
+        output.flush()
+        output.close()
+      }
 
-      z3.destroyForcibly()
-      z3.waitFor(10, TimeUnit.SECONDS) /* Makes the current thread wait until the process has been shut down */
+      if (input != null) {
+        input.close()
+      }
 
-      termConverter.stop()
+      if (z3 != null) {
+        z3.destroyForcibly()
+        z3.waitFor(10, TimeUnit.SECONDS) /* Makes the current thread wait until the process has been shut down */
+      }
     }
   }
 
@@ -357,7 +370,7 @@ class Z3ProverStdIO(uniqueId: String,
       if (result.toLowerCase != "success") comment(result)
 
       val warning = result.startsWith("WARNING")
-      if (warning) logger.info(s"Z3: $result")
+      if (warning) logger.warn(s"Z3 warning: $result")
 
       repeat = warning
     }
