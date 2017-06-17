@@ -6,10 +6,11 @@
 
 package viper.silicon.rules
 
-import viper.silicon.SymbExLogger
+import viper.silicon.{JSTreeRenderer, SymbExLogger}
 import viper.silicon.interfaces.Failure
 import viper.silicon.verifier.Verifier
-import viper.silver.verifier.VerificationError
+import viper.silver.verifier.{AbstractVerificationError, VerificationError}
+import viper.silver.verifier.errors.VerificationErrorWithCounterexample
 
 trait SymbolicExecutionRules extends Immutable {
   protected def failure(ve: VerificationError, v: Verifier, generateNewModel: Boolean = false): Failure = {
@@ -18,8 +19,12 @@ trait SymbolicExecutionRules extends Immutable {
         v.decider.generateModel()
       }
       val model = v.decider.getModel()
+      val jsRenderer = new JSTreeRenderer()
+      val symState = jsRenderer.render(SymbExLogger.memberList)
       SymbExLogger.printError(ve.toString, model)
+      Failure(VerificationErrorWithCounterexample(ve.asInstanceOf[AbstractVerificationError], model, symState))
+    }else {
+      Failure(ve)
     }
-    Failure(ve)
   }
 }
