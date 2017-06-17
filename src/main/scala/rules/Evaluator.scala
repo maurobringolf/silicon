@@ -206,7 +206,7 @@ object evaluator extends EvaluationRules with Immutable {
               val totalPermissions = BigPermSum(relevantChunks.map(_.perm), Predef.identity)
               v1.decider.assert(IsPositive(totalPermissions.replace(`?r`, tRcvr))) {
                 case false =>
-                  Failure(pve dueTo InsufficientPermission(fa))
+                  failure(pve dueTo InsufficientPermission(fa), v1)
                 case true =>
                   val (fvf, fvfValueDefs, None) =
                     quantifiedChunkSupporter.summarise(s1, relevantChunks, Seq(`?r`), fa.field, None, v1)

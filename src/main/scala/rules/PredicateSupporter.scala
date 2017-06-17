@@ -21,6 +21,7 @@ trait PredicateSupportRules extends SymbolicExecutionRules {
            predicate: ast.Predicate,
            tArgs: List[Term],
            tPerm: Term,
+           constrainableWildcards: InsertionOrderedSet[Var],
            pve: PartialVerificationError,
            v: Verifier)
           (Q: (State, Verifier) => VerificationResult)
@@ -30,6 +31,7 @@ trait PredicateSupportRules extends SymbolicExecutionRules {
              predicate: ast.Predicate,
              tArgs: List[Term],
              tPerm: Term,
+             constrainableWildcards: InsertionOrderedSet[Var],
              pve: PartialVerificationError,
              v: Verifier,
              pa: ast.PredicateAccess /* TODO: Make optional */)
@@ -60,7 +62,7 @@ object predicateSupporter extends PredicateSupportRules with Immutable {
       val predTrigger = App(Verifier.predicateData(predicate).triggerFunction,
                             snap.convert(terms.sorts.Snap) +: tArgs)
       v1.decider.assume(predTrigger)
-      val s2 = s1a.setConstrainable(constrainableWildcards, false)
+      val s2 = s1.setConstrainable(constrainableWildcards, false)
       if (s2.qpPredicates.contains(predicate)) {
         val predSnap = snap.convert(s2.predicateSnapMap(predicate))
         val formalArgs = s2.predicateFormalVarMap(predicate)
@@ -91,6 +93,7 @@ object predicateSupporter extends PredicateSupportRules with Immutable {
              predicate: ast.Predicate,
              tArgs: List[Term],
              tPerm: Term,
+             constrainableWildcards: InsertionOrderedSet[Var],
              pve: PartialVerificationError,
              v: Verifier,
              pa: ast.PredicateAccess)
