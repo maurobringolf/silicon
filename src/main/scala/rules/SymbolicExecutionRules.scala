@@ -23,7 +23,7 @@ trait SymbolicExecutionRules extends Immutable {
       val jsRenderer = new JSTreeRenderer()
       val symState = jsRenderer.render(SymbExLogger.memberList)
       SymbExLogger.printError(ve.toString, model)
-      val currentMember = if (SymbExLogger.memberList.length > 0 && SymbExLogger.memberList.last.main.isInstanceOf[Member]) SymbExLogger.memberList.last.main.value.asInstanceOf[Member].name else "UNKNOWN"
+      val currentMember = if (SymbExLogger.memberList.length > 0 && SymbExLogger.memberList.last.main.value.isInstanceOf[Member]) SymbExLogger.memberList.last.main.value.asInstanceOf[Member].name else "UNKNOWN"
       Failure(VerificationErrorWithCounterexample(ve.asInstanceOf[AbstractVerificationError], model, symState, currentMember))
     }else {
       Failure(ve)
