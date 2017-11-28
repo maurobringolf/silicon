@@ -47,7 +47,7 @@ object sorts {
     override val toString = id.toString
   }
 
-  case class UserSort(id: Identifier) extends Sort {
+  case class UserSort(id: Identifier, literal: Boolean = false) extends Sort {
     override val toString = id.toString
   }
 
@@ -90,6 +90,7 @@ sealed trait Applicable extends Symbol {
 sealed trait Application[A <: Applicable] extends Term {
   def applicable: A
   def args: Seq[Term]
+  def literal: Boolean = false
 }
 
 sealed trait Function extends Applicable
@@ -173,7 +174,7 @@ case class Var(id: Identifier, sort: Sort) extends Function with Application[Var
   override val toString = id.toString
 }
 
-class App(val applicable: Applicable, val args: Seq[Term])
+class App(val applicable: Applicable, val args: Seq[Term], override val literal: Boolean = false)
     extends Application[Applicable]
        with StructuralEquality {
        /*with PossibleTrigger*/
@@ -189,8 +190,8 @@ class App(val applicable: Applicable, val args: Seq[Term])
     else s"${applicable.id}${args.mkString("(", ", ", ")")}"
 }
 
-object App extends ((Applicable, Seq[Term]) => App) {
-  def apply(applicable: Applicable, args: Seq[Term]) = new App(applicable, args)
+object App extends ((Applicable, Seq[Term], Boolean) => App) {
+  def apply(applicable: Applicable, args: Seq[Term], literal: Boolean = false) = new App(applicable, args, literal)
   def apply(applicable: Applicable, arg: Term) = new App(applicable, Seq(arg))
   def unapply(app: App) = Some((app.applicable, app.args))
 }

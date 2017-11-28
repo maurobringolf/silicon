@@ -10,6 +10,6 @@ import viper.silicon.state.terms.{Term, Sort, Decl}
 
 trait TermConverter[T, S, D] {
   def convert(term: Term): T
-  def convert(sort: Sort): S
+  def convert(sort: Sort, forceSanitize: Boolean = false): S
   def convert(decl: Decl): D
 }

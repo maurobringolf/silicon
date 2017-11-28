@@ -384,12 +384,20 @@ object evaluator extends EvaluationRules with Immutable {
       /* Others */
 
       /* Domains not handled directly */
-      case dfa @ ast.DomainFuncApp(funcName, eArgs, _) =>
+      case dfa @ ast.DomainFuncApp(funcName, eArgs, _) => {
         evals(s, eArgs, _ => pve, v)((s1, tArgs, v1) => {
           val inSorts = tArgs map (_.sort)
           val outSort = v1.symbolConverter.toSort(dfa.typ)
-          val fi = v1.symbolConverter.toFunction(Verifier.program.findDomainFunction(funcName), inSorts :+ outSort)
-          Q(s1, App(fi, tArgs), v1)})
+          val func = Verifier.program.findDomainFunction(funcName)
+          if (func.smtName.isDefined){
+            val fi = v1.symbolConverter.toNativeFunction(func.smtName.get, inSorts :+ outSort)
+            Q(s1, App(fi, tArgs, true), v1)
+          }else{
+            val fi = v1.symbolConverter.toFunction(func, inSorts :+ outSort)
+            Q(s1, App(fi, tArgs), v1)
+          }
+        })
+      }
 
       case ast.CurrentPerm(locacc) =>
         val h = s.partiallyConsumedHeap.getOrElse(s.h)

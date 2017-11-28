@@ -27,11 +27,15 @@ class TermToSMTLib2Converter
 
   private val nameSanitizer = new SmtlibNameSanitizer
 
-  def convert(s: Sort): String = {
-    super.pretty(defaultWidth, render(s))
+  def convert(s: Sort, forceSanitize: Boolean = false): String = {
+    super.pretty(defaultWidth, renderSort(s, forceSanitize))
   }
 
-  protected def render(sort: Sort): Cont = sort match {
+  protected def render(sort: Sort): Cont = {
+    renderSort(sort, false)
+  }
+
+  protected def renderSort(sort: Sort, forceSanitize: Boolean): Cont = sort match {
     case sorts.Int => "Int"
     case sorts.Bool => "Bool"
     case sorts.Perm => "$Perm"
@@ -40,7 +44,7 @@ class TermToSMTLib2Converter
     case sorts.Seq(elementSort) => text("$Seq<") <> render(elementSort) <> ">"
     case sorts.Set(elementSort) => text("Set<") <> render(elementSort) <> ">"
     case sorts.Multiset(elementSort) => text("Multiset<") <> render(elementSort) <> ">"
-    case sorts.UserSort(id) => sanitize(id)
+    case sorts.UserSort(id, literal) => if (forceSanitize || !literal) sanitize(id) else id.name
 
     case sorts.Unit =>
       /* Sort Unit corresponds to Scala's Unit type and is used, e.g., as the
@@ -99,7 +103,7 @@ class TermToSMTLib2Converter
       sanitize(x.id)
 
     case fapp: Application[_] =>
-      renderApp(fapp.applicable.id.name, fapp.args, fapp.sort)
+      renderApp(fapp.applicable.id.name, fapp.args, fapp.sort, fapp.literal)
 
     /* Split axioms with more than one trigger set into multiple copies of the same
      * axiom, each with a single trigger. This can avoid incompletenesses due to Z3
@@ -280,12 +284,13 @@ class TermToSMTLib2Converter
     parens(text(op) <> nest(defaultIndent, group(line <> ssep((terms map render).to[collection.immutable.Seq], line))))
 
   @inline
-  protected def renderApp(functionName: String, args: Seq[Term], outSort: Sort) = {
-    val inSorts = args map (_.sort)
+  protected def renderApp(functionName: String, args: Seq[Term], outSort: Sort, literal: Boolean = false) = {
     val id = Identifier(functionName)
 
+    val actualName = if (literal) functionName else sanitize(functionName)
+
     val docAppNoParens =
-      text(sanitize(functionName)) <+> ssep((args map render).to[collection.immutable.Seq], space)
+      text(actualName) <+> ssep((args map render).to[collection.immutable.Seq], space)
 
     if (args.nonEmpty)
       parens(docAppNoParens)

@@ -372,7 +372,8 @@ class DefaultMasterVerifier(config: Config, reporter: Reporter)
         sink.declare(fromSnapWrapper)
 
         preambleReader.emitParametricPreamble("/sortwrappers.smt2",
-                                              Map("$S$" -> termConverter.convert(sort)),
+                                              Map("$S$" -> termConverter.convert(sort, true),
+                                                  "$Z$" -> termConverter.convert(sort, false)),
                                               sink)
       })
     }

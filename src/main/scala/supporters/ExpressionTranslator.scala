@@ -119,13 +119,14 @@ trait ExpressionTranslator {
 
       case v: ast.AbstractLocalVar => Var(Identifier(v.name), toSort(v.typ))
 
-      case ast.DomainFuncApp(funcName, args, _) =>
+      case ast.DomainFuncApp(funcName, args, _) => {
         val tArgs = args map f
         val inSorts = tArgs map (_.sort)
         val outSort = toSort(exp.typ)
         val id = Identifier(funcName)
         val df = Fun(id, inSorts, outSort)
         App(df, tArgs)
+      }
 
       /* Permissions */
 

@@ -25,6 +25,7 @@ class DefaultDomainsContributor(symbolConverter: SymbolConverter,
     extends DomainsContributor[Sort, DomainFun, Term, Term] {
 
   private var collectedSorts = InsertionOrderedSet[Sort]()
+  private var sortsToDeclare = InsertionOrderedSet[Sort]()
   private var collectedFunctions = InsertionOrderedSet[terms.DomainFun]()
   private var collectedAxioms = InsertionOrderedSet[Term]()
   private var uniqueSymbols = MultiMap.empty[Sort, Symbol]
@@ -33,6 +34,7 @@ class DefaultDomainsContributor(symbolConverter: SymbolConverter,
 
   def reset() {
     collectedSorts = collectedSorts.empty
+    sortsToDeclare = sortsToDeclare.empty
     collectedFunctions = collectedFunctions.empty
     collectedAxioms = collectedAxioms.empty
     uniqueSymbols = MultiMap.empty
@@ -47,6 +49,8 @@ class DefaultDomainsContributor(symbolConverter: SymbolConverter,
     /* Compute necessary instances of all user-declared Viper domains */
     val necessaryDomainTypes = program.groundTypeInstances.collect{case d: ast.DomainType => d}
 
+    val necessaryBackendTypes = program.collect{case t: ast.BackendType => t}.toSet
+
     /* A map from domain names to domain nodes */
     val domainNameMap = toMap(program.domains.map(d => d.name -> d))
 
@@ -56,6 +60,14 @@ class DefaultDomainsContributor(symbolConverter: SymbolConverter,
 
     collectDomainSorts(necessaryDomainTypes)
     collectDomainMembers(instantiatedDomains)
+    collectBackendSorts(necessaryBackendTypes)
+  }
+
+  private def collectBackendSorts(backendTypes: Iterable[ast.BackendType]): Unit ={
+    backendTypes.foreach(backendType => {
+      val backendSort = symbolConverter.toSort(backendType)
+      collectedSorts += backendSort
+    })
   }
 
   private def collectDomainSorts(domainTypes: Iterable[ast.DomainType]) {
@@ -64,6 +76,7 @@ class DefaultDomainsContributor(symbolConverter: SymbolConverter,
     domainTypes.foreach(domainType => {
       val domainSort = symbolConverter.toSort(domainType)
       collectedSorts += domainSort
+      sortsToDeclare += domainSort
     })
   }
 
@@ -84,8 +97,8 @@ class DefaultDomainsContributor(symbolConverter: SymbolConverter,
     instantiatedDomains foreach (domain => {
       domain.functions foreach (function => {
         val fct = symbolConverter.toFunction(function)
-
-        collectedFunctions += fct
+        if (!function.smtName.isDefined)
+          collectedFunctions += fct
 
         if (function.unique) {
           assert(function.formalArgs.isEmpty,
@@ -105,7 +118,7 @@ class DefaultDomainsContributor(symbolConverter: SymbolConverter,
   def sortsAfterAnalysis: Iterable[terms.Sort] = collectedSorts
 
   def declareSortsAfterAnalysis(sink: ProverLike): Unit = {
-    collectedSorts foreach (s => sink.declare(terms.SortDecl(s)))
+    sortsToDeclare foreach (s => sink.declare(terms.SortDecl(s)))
   }
 
   def symbolsAfterAnalysis: Iterable[terms.DomainFun] = collectedFunctions
