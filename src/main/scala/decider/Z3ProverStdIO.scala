@@ -19,7 +19,7 @@ import viper.silicon.state.terms._
 import viper.silicon.verifier.Verifier
 
 class Z3ProverStdIO(uniqueId: String,
-                    termConverter: TermToSMTLib2Converter,
+                    val termConverter: TermToSMTLib2Converter,
                     identifierFactory: IdentifierFactory)
     extends Prover
        with LazyLogging {
@@ -217,11 +217,16 @@ class Z3ProverStdIO(uniqueId: String,
     }
   }
 
-  def saturate(timeout: Int, comment: String): Unit = {
-    this.comment(s"State saturation: $comment")
+  def saturate(timeout: Int, cmment: String): Unit = {
+    this.comment(s"State saturation: $cmment")
     setTimeout(Some(timeout))
+    val startTime = System.currentTimeMillis()
     writeLine("(check-sat)")
     readLine()
+    val endTime = System.currentTimeMillis()
+    val duration = endTime - startTime
+    comment(s"${viper.silicon.common.format.formatMillisReadably(duration)}")
+    comment("(get-info :all-statistics)")
   }
 
   private def getModel(): Unit = {

@@ -9,7 +9,7 @@ package viper.silicon.state
 import viper.silver.components.StatefulComponent
 import viper.silicon.utils.Counter
 
-sealed trait Identifier {
+sealed trait Identifier extends Serializable {
   def name: String
   def rename(fn: String => String): Identifier
 

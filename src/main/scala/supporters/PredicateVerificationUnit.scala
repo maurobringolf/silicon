@@ -90,10 +90,17 @@ trait DefaultPredicateVerificationUnitProvider extends VerifierComponent { v: Ve
 
       SymbExLogger.insertMember(predicate, null, v.decider.pcs)
 
+      if (Verifier.config.shouldVerifyPredicate(predicate.name))
+        doVerify(sInit, predicate)
+      else
+        Seq(Success())
+    }
+
+    private def doVerify(sInit: State, predicate: ast.Predicate): Seq[VerificationResult] = {
       val ins = predicate.formalArgs.map(_.localVar)
       val s = sInit.copy(g = Store(ins.map(x => (x, decider.fresh(x)))),
-                         h = Heap(),
-                         oldHeaps = OldHeaps())
+        h = Heap(),
+        oldHeaps = OldHeaps())
       val err = PredicateNotWellformed(predicate)
 
       val result = predicate.body match {
@@ -103,8 +110,8 @@ trait DefaultPredicateVerificationUnitProvider extends VerifierComponent { v: Ve
           /*    locallyXXX {
                 magicWandSupporter.checkWandsAreSelfFraming(σ.γ, σ.h, predicate, c)}
           &&*/  executionFlowController.locally(s, v)((s1, _) => {
-                  produce(s1, freshSnap, body, err, v)((_, _) =>
-                    Success())})
+          produce(s1, freshSnap, body, err, v)((_, _) =>
+            Success())})
       }
 
       Seq(result)

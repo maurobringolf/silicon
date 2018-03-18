@@ -6,7 +6,14 @@
 
 package viper.silicon.supporters.functions
 
+import java.io._
+import java.nio.file.Files
+
 import ch.qos.logback.classic.Logger
+import com.fasterxml.jackson.databind.{DeserializationFeature, ObjectMapper, SerializationFeature}
+import com.fasterxml.jackson.module.scala.DefaultScalaModule
+
+import scala.collection.JavaConversions._
 import viper.silver.ast
 import viper.silver.ast.utility.Functions
 import viper.silver.components.StatefulComponent
@@ -19,10 +26,12 @@ import viper.silicon.state.State.OldHeaps
 import viper.silicon.state.terms._
 import viper.silicon.state.terms.predef.`?s`
 import viper.silicon.common.collections.immutable.InsertionOrderedSet
-import viper.silicon.decider.Decider
+import viper.silicon.decider.{Decider, DefaultDeciderProvider, Z3ProverStdIO}
 import viper.silicon.rules.{consumer, evaluator, executionFlowController, producer}
 import viper.silicon.verifier.{Verifier, VerifierComponent}
 import viper.silicon.utils.toSf
+
+
 
 trait FunctionVerificationUnit[SO, SY, AX]
     extends VerifyingPreambleContributor[SO, SY, AX, ast.Function]
@@ -139,12 +148,16 @@ trait DefaultFunctionVerificationUnitProvider extends VerifierComponent { v: Ver
       data.formalArgs.values foreach (v => decider.prover.declare(ConstDecl(v)))
       decider.prover.declare(ConstDecl(data.formalResult))
 
-      Seq(handleFunction(sInit, function))
+      if (Verifier.config.shouldVerifyFunction(function.name))
+        Seq(handleFunction(sInit, function))
+      else
+        Seq(handleCorrectFunction(sInit, function))
     }
 
     private def handleFunction(sInit: State, function: ast.Function): VerificationResult = {
       val data = functionData(function)
       val s = sInit.copy(functionRecorder = ActualFunctionRecorder(data), conservingSnapshotGeneration = true)
+      val lenEmitted = emittedFunctionAxioms.length
 
       /* Phase 1: Check well-definedness of the specifications */
       checkSpecificationWelldefinedness(s, function) match {
@@ -158,9 +171,25 @@ trait DefaultFunctionVerificationUnitProvider extends VerifierComponent { v: Ver
           emitAndRecordFunctionAxioms(data.triggerAxiom)
           emitAndRecordFunctionAxioms(data.postAxiom.toSeq: _*)
 
-          if (function.body.isEmpty)
+          if (function.body.isEmpty) {
+            if (Verifier.config.functionCache.isDefined) {
+              val name = function.name + "@" + function.toString().hashCode.toString + ".func"
+              val path: String = Verifier.config.functionCache.toOption.get + File.separator + name
+              val allAxioms = emittedFunctionAxioms.drop(lenEmitted)
+
+
+              val texts: Seq[String] = allAxioms.map{s =>  decider.prover.asInstanceOf[Z3ProverStdIO].termConverter.convert(s)}
+
+
+              val is = new PrintWriter(path)
+              for (text <- texts) {
+                is.println(text)
+                is.println()
+              }
+              is.close()
+            }
             result1
-          else {
+          }else {
             /* Phase 2: Verify the function's postcondition */
             val result2 = verify(function, phase1data)
 
@@ -169,11 +198,57 @@ trait DefaultFunctionVerificationUnitProvider extends VerifierComponent { v: Ver
                 data.verificationFailures = data.verificationFailures :+ fatalResult
               case _ =>
                 emitAndRecordFunctionAxioms(data.definitionalAxiom.toSeq: _*)
+                if (Verifier.config.functionCache.isDefined){
+                  val name = function.name + "@" + function.toString().hashCode.toString + ".func"
+                  val path: String = Verifier.config.functionCache.toOption.get + File.separator + name
+                  val allAxioms = emittedFunctionAxioms.drop(lenEmitted)
+
+                  val texts: Seq[String] = allAxioms.map{s =>  decider.prover.asInstanceOf[Z3ProverStdIO].termConverter.convert(s)}
+
+                  val is = new PrintWriter(path)
+                  for (text <- texts) {
+                    is.println(text)
+                    is.println()
+                  }
+                  is.close()
+                }
+
             }
 
             result1 && result2
           }
       }
+    }
+
+    private def handleCorrectFunction(sInit: State, function: ast.Function): VerificationResult = {
+      if (Verifier.config.functionCache.isDefined){
+        val name = function.name + "@" + function.toString().hashCode + ".func"
+        val path: String = Verifier.config.functionCache.toOption.get + File.separator + name
+        if (Files.exists(java.nio.file.Paths.get(path))){
+
+          val lines = Files.readAllLines(java.nio.file.Paths.get(path));
+
+          var linelines : Seq[String] = Seq()
+          var current = ""
+          for (line <- lines){
+            current = current + line
+            if (line == ""){
+              linelines = linelines ++ Seq(current)
+              current = ""
+            }
+          }
+
+          val terms = linelines.toList.map{s: String =>  StringWrapper(s)}
+
+
+          emitAndRecordFunctionAxioms(terms: _*)
+          return Success()
+        }
+      }
+      Verifier.config.assumeCorrect = true
+      val result = handleFunction(sInit, function)
+      Verifier.config.assumeCorrect = false
+      result
     }
 
     private def checkSpecificationWelldefinedness(sInit: State, function: ast.Function)

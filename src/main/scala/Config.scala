@@ -219,6 +219,19 @@ class Config(args: Seq[String]) extends SilFrontendConfig(args, "Silicon") {
     hidden = false
   )
 
+  val ignoreAuxiliary = opt[Boolean]("ignoreAuxiliary",
+    descr = "Assume predicates and functions to be correct and well-defined",
+    default  = Some(false),
+    noshort = true,
+    hidden = Silicon.hideInternalOptions
+  )
+
+  val functionCache = opt[String]("functionCache",
+    descr = "Cache functions at this path",
+    noshort = true,
+    hidden = Silicon.hideInternalOptions
+  )
+
   val checkTimeout = opt[Int]("checkTimeout",
     descr = (  "Timeout (in ms) per SMT solver check. Solver checks differ from solver asserts "
              + "in that a failing assert always yields a verification error whereas a failing "
@@ -238,6 +251,11 @@ class Config(args: Seq[String]) extends SilFrontendConfig(args, "Silicon") {
     noshort = true,
     hidden = Silicon.hideInternalOptions
   )
+
+  def shouldVerifyPredicate(name: String) : Boolean = !ignoreAuxiliary()
+  def shouldVerifyFunction(name: String) : Boolean = !ignoreAuxiliary()
+
+  var assumeCorrect = false
 
   /* Attention: Update companion object if number of weights changes! */
   case class Z3SaturationTimeoutWeights(afterPreamble: Float = 1,

@@ -12,7 +12,7 @@ import viper.silicon.common.collections.immutable.InsertionOrderedSet
 import viper.silicon.{Map, Stack, state, toMap}
 import viper.silicon.state.{Identifier, MagicWandChunk}
 
-sealed trait Node
+sealed trait Node extends Serializable
 
 sealed trait Symbol extends Node {
   def id: Identifier
@@ -92,7 +92,7 @@ sealed trait Application[A <: Applicable] extends Term {
   def args: Seq[Term]
 }
 
-sealed trait Function extends Applicable
+sealed trait Function extends Applicable with Serializable
 
 object Function {
   def unapply(fun: Function): Option[(Identifier, Seq[Sort], Sort)] =
@@ -104,7 +104,7 @@ object Function {
  *      (i.e. field) that indicates the kind of
  */
 
-trait GenericFunction[F <: Function] extends Function with StructuralEquality {
+trait GenericFunction[F <: Function] extends Function with StructuralEquality with Serializable {
   val equalityDefiningMembers = id +: argSorts :+ resultSort
 
   def copy(id: Identifier = id, argSorts: Seq[Sort] = argSorts, resultSort: Sort = resultSort): F
@@ -140,8 +140,8 @@ object Fun extends ((Identifier, Seq[Sort], Sort) => Fun) with GenericFunctionCo
  *       toLimited/toStateless, and to remove the corresponding methods from the FunctionSupporter
  *       object.
  */
-class HeapDepFun(val id: Identifier, val argSorts: Seq[Sort], val resultSort: Sort)
-    extends GenericFunction[HeapDepFun] {
+class HeapDepFun(var id: Identifier, var argSorts: Seq[Sort], var resultSort: Sort)
+    extends GenericFunction[HeapDepFun] with Serializable {
 
   def copy(id: Identifier = id, argSorts: Seq[Sort] = argSorts, resultSort: Sort = resultSort) =
     HeapDepFun(id, argSorts, resultSort)
@@ -213,7 +213,7 @@ object App extends ((Applicable, Seq[Term]) => App) {
  * optimisations, as done in the work on the type safe builder pattern.
  */
 
-sealed trait Term extends Node {
+sealed trait Term extends Node with Serializable {
   def sort: Sort
 
   def ===(t: Term): Term = Equals(this, t)
@@ -366,6 +366,10 @@ trait StructuralEquality { self: AnyRef =>
 
 /* Literals */
 
+case class StringWrapper(val value: String) extends Term {
+  def sort = sorts.Int
+}
+
 sealed trait Literal extends Term
 
 case object Unit extends SnapshotTerm with Literal {
@@ -464,7 +468,7 @@ class Quantification private[terms] (val q: Quantifier, /* TODO: Rename */
                                      val name: String,
                                      val isGlobal: Boolean)
     extends BooleanTerm
-       with StructuralEquality {
+       with StructuralEquality with Serializable {
 
   val equalityDefiningMembers = q :: vars :: body :: triggers :: Nil
 
@@ -987,8 +991,8 @@ case class IsValidPermVar(v: Var) extends BooleanTerm {
   override val toString = s"PVar($v)"
 }
 
-case class IsReadPermVar(v: Var, ub: Term) extends BooleanTerm {
-  override val toString = s"RdVar($v, $ub)"
+case class IsReadPermVar(v: Var) extends BooleanTerm {
+  override val toString = s"RdVar($v)"
 }
 
 class PermTimes(val p0: Term, val p1: Term)

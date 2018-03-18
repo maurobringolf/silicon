@@ -181,12 +181,19 @@ trait DefaultDeciderProvider extends VerifierComponent { this: Verifier =>
 
     def checkSmoke() = prover.check(Verifier.config.checkTimeout.toOption) == Unsat
 
-    def check(t: Term, timeout: Int) = deciderAssert(t, Some(timeout))
+    def check(t: Term, timeout: Int) = {
+      val result = deciderAssert(t, Some(timeout))
+      result
+    }
 
     def assert(t: Term, timeout: Option[Int] = None)(Q: Boolean => VerificationResult) = {
-      val success = deciderAssert(t, timeout)
+      if (Verifier.config.assumeCorrect){
+        Q(true)
+      }else {
+        val success = deciderAssert(t, timeout)
 
-      Q(success)
+        Q(success)
+      }
     }
 
     private def deciderAssert(t: Term, timeout: Option[Int]) = {
@@ -223,7 +230,7 @@ trait DefaultDeciderProvider extends VerifierComponent { this: Verifier =>
 
     def freshARP(id: String = "$k", upperBound: Term = FullPerm()): (Var, Term) = {
       val permVar = prover_fresh[Var](id, Nil, sorts.Perm)
-      val permVarConstraints = IsReadPermVar(permVar, upperBound)
+      val permVarConstraints = IsReadPermVar(permVar)
 
       (permVar, permVarConstraints)
     }
