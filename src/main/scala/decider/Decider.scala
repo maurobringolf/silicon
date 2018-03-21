@@ -230,7 +230,7 @@ trait DefaultDeciderProvider extends VerifierComponent { this: Verifier =>
 
     def freshARP(id: String = "$k", upperBound: Term = FullPerm()): (Var, Term) = {
       val permVar = prover_fresh[Var](id, Nil, sorts.Perm)
-      val permVarConstraints = IsReadPermVar(permVar)
+      val permVarConstraints = IsReadPermVar(permVar, upperBound)
 
       (permVar, permVarConstraints)
     }

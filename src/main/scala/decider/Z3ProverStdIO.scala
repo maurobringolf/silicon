@@ -334,6 +334,10 @@ class Z3ProverStdIO(uniqueId: String,
     emit(str)
   }
 
+  def declareWrapped(decl: WrappedFunc): Unit = {
+    emit(decl.decl)
+  }
+
 //  def resetAssertionCounter() { bookkeeper.assertionCounter = 0 }
 //  def resetAssumptionCounter() { bookkeeper.assumptionCounter = 0 }
 

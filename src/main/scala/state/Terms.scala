@@ -6,6 +6,8 @@
 
 package viper.silicon.state.terms
 
+import sun.reflect.generics.reflectiveObjects.NotImplementedException
+
 import scala.reflect.ClassTag
 import viper.silver.ast.utility.Visitor
 import viper.silicon.common.collections.immutable.InsertionOrderedSet
@@ -73,6 +75,7 @@ case class SortDecl(sort: Sort) extends Decl
 case class FunctionDecl(func: Function) extends Decl
 case class SortWrapperDecl(from: Sort, to: Sort) extends Decl
 case class MacroDecl(id: Identifier, args: Seq[Var], body: Term) extends Decl
+case class StringWrapperDecl(wrapped: StringWrapper) extends Decl
 
 object ConstDecl extends (Var => Decl) { /* TODO: Inconsistent naming - Const vs Var */
   def apply(v: Var) = FunctionDecl(v)
@@ -98,6 +101,7 @@ object Function {
   def unapply(fun: Function): Option[(Identifier, Seq[Sort], Sort)] =
     Some((fun.id, fun.argSorts, fun.resultSort))
 }
+
 
 /* RFC: [18-12-2015 Malte] An alternative to using different sub-classes of Function (e.g.
  *      Fun, HeapDepFun, ...) would be to use a single Fun class that as an additional property
@@ -129,6 +133,18 @@ class Fun(val id: Identifier, val argSorts: Seq[Sort], val resultSort: Sort)
 
   def copy(id: Identifier = id, argSorts: Seq[Sort] = argSorts, resultSort: Sort = resultSort) =
     Fun(id, argSorts, resultSort)
+}
+
+case class WrappedFunc(val decl : String) extends Function {
+  override def argSorts() = {
+    throw new  NotImplementedException()
+  }
+  override def resultSort() = {
+    throw new  NotImplementedException()
+  }
+  override def id() = {
+    throw new  NotImplementedException()
+  }
 }
 
 object Fun extends ((Identifier, Seq[Sort], Sort) => Fun) with GenericFunctionCompanion[Fun] {
@@ -991,8 +1007,8 @@ case class IsValidPermVar(v: Var) extends BooleanTerm {
   override val toString = s"PVar($v)"
 }
 
-case class IsReadPermVar(v: Var) extends BooleanTerm {
-  override val toString = s"RdVar($v)"
+case class IsReadPermVar(v: Var, ub: Term) extends BooleanTerm {
+  override val toString = s"RdVar($v, $ub)"
 }
 
 class PermTimes(val p0: Term, val p1: Term)

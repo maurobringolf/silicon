@@ -8,6 +8,7 @@ package viper.silicon.verifier
 
 import java.text.SimpleDateFormat
 import java.util.concurrent._
+
 import viper.silver.ast
 import viper.silver.components.StatefulComponent
 import viper.silicon._
@@ -17,7 +18,7 @@ import viper.silicon.interfaces._
 import viper.silicon.interfaces.decider.ProverLike
 import viper.silicon.reporting.condenseToViperResult
 import viper.silicon.state._
-import viper.silicon.state.terms.{Decl, Sort, Term, sorts}
+import viper.silicon.state.terms.{Decl, Sort, Term, WrappedFunc, sorts}
 import viper.silicon.supporters._
 import viper.silicon.supporters.functions.DefaultFunctionVerificationUnitProvider
 import viper.silicon.supporters.qps._
@@ -102,6 +103,11 @@ class DefaultMasterVerifier(config: Config, reporter: Reporter)
     def declare(decl: Decl): Unit = {
       decider.prover.declare(decl)
       _verificationPoolManager.pooledVerifiers.declare(decl)
+    }
+
+    def declareWrapped(decl: WrappedFunc): Unit = {
+      decider.prover.declareWrapped(decl)
+      _verificationPoolManager.pooledVerifiers.declareWrapped(decl)
     }
 
     def comment(content: String): Unit = {

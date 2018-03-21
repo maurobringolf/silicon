@@ -174,7 +174,7 @@ class TermToSMTLib2Converter
     case PermIntDiv(t0, t1) => renderBinaryOp("/", renderAsReal(t0), renderAsReal(t1))
     case PermMin(t0, t1) => renderBinaryOp("$Perm.min", render(t0), render(t1))
     case IsValidPermVar(v) => parens(text("$Perm.isValidVar") <+> render(v))
-    case IsReadPermVar(v) => parens(text("$Perm.isReadVar") <+> render(v))
+    case IsReadPermVar(v, ub) => parens(text("$Perm.isReadVar") <+> render(v) <+> render(ub))
 
     /* Sequences */
 

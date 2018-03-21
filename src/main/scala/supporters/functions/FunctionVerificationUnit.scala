@@ -23,7 +23,7 @@ import viper.silicon.interfaces.decider.ProverLike
 import viper.silicon.interfaces._
 import viper.silicon.state._
 import viper.silicon.state.State.OldHeaps
-import viper.silicon.state.terms._
+import viper.silicon.state.terms.{WrappedFunc, _}
 import viper.silicon.state.terms.predef.`?s`
 import viper.silicon.common.collections.immutable.InsertionOrderedSet
 import viper.silicon.decider.{Decider, DefaultDeciderProvider, Z3ProverStdIO}
@@ -178,8 +178,9 @@ trait DefaultFunctionVerificationUnitProvider extends VerifierComponent { v: Ver
               val allAxioms = emittedFunctionAxioms.drop(lenEmitted)
 
 
-              val texts: Seq[String] = allAxioms.map{s =>  decider.prover.asInstanceOf[Z3ProverStdIO].termConverter.convert(s)}
-
+              val symbolTexts = data.getFreshSymbolsAcrossAllPhases.toList.map{s =>  decider.prover.asInstanceOf[Z3ProverStdIO].termConverter.convert(FunctionDecl(s))}
+              val axiomTexts: Seq[String] = allAxioms.toList.map{s =>  decider.prover.asInstanceOf[Z3ProverStdIO].termConverter.convert(s)}
+              val texts = symbolTexts ++ axiomTexts
 
               val is = new PrintWriter(path)
               for (text <- texts) {
@@ -203,7 +204,9 @@ trait DefaultFunctionVerificationUnitProvider extends VerifierComponent { v: Ver
                   val path: String = Verifier.config.functionCache.toOption.get + File.separator + name
                   val allAxioms = emittedFunctionAxioms.drop(lenEmitted)
 
-                  val texts: Seq[String] = allAxioms.map{s =>  decider.prover.asInstanceOf[Z3ProverStdIO].termConverter.convert(s)}
+                  val symbolTexts = data.getFreshSymbolsAcrossAllPhases.toList.map{s =>  decider.prover.asInstanceOf[Z3ProverStdIO].termConverter.convert(FunctionDecl(s))}
+                  val axiomTexts: Seq[String] = allAxioms.toList.map{s =>  decider.prover.asInstanceOf[Z3ProverStdIO].termConverter.convert(s)}
+                  val texts = symbolTexts ++ axiomTexts
 
                   val is = new PrintWriter(path)
                   for (text <- texts) {
@@ -221,6 +224,7 @@ trait DefaultFunctionVerificationUnitProvider extends VerifierComponent { v: Ver
     }
 
     private def handleCorrectFunction(sInit: State, function: ast.Function): VerificationResult = {
+      val data = functionData(function)
       if (Verifier.config.functionCache.isDefined){
         val name = function.name + "@" + function.toString().hashCode + ".func"
         val path: String = Verifier.config.functionCache.toOption.get + File.separator + name
@@ -238,10 +242,12 @@ trait DefaultFunctionVerificationUnitProvider extends VerifierComponent { v: Ver
             }
           }
 
-          val terms = linelines.toList.map{s: String =>  StringWrapper(s)}
+          val axioms = linelines.filter(s => !s.startsWith("(declare-fun")).toList.map{s: String =>  StringWrapper(s)}
+          val funcs: List[WrappedFunc] = linelines.filter(s => s.startsWith("(declare-fun")).toList.map{s: String => WrappedFunc(s)}
 
-
-          emitAndRecordFunctionAxioms(terms: _*)
+          data.freshSymbolsAcrossAllPhases ++= funcs
+          funcs.map(fd => decider.prover.declareWrapped(fd))
+          emitAndRecordFunctionAxioms(axioms: _*)
           return Success()
         }
       }
@@ -330,7 +336,8 @@ trait DefaultFunctionVerificationUnitProvider extends VerifierComponent { v: Ver
     def declareSymbolsAfterVerification(sink: ProverLike): Unit = {
       generateFunctionSymbolsAfterVerification foreach {
         case Left(comment) => sink.comment(comment)
-        case Right(f) => sink.declare(FunctionDecl(f))
+        case Right(f) if !f.isInstanceOf[WrappedFunc] => sink.declare(FunctionDecl(f))
+        case Right(wf@WrappedFunc(decl)) => sink.declareWrapped(wf)
       }
 
       freshVars foreach (x => sink.declare(ConstDecl(x)))

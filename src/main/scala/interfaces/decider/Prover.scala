@@ -21,6 +21,7 @@ trait ProverLike {
   def emit(contents: Iterable[String]): Unit = { contents foreach emit }
   def assume(term: Term)
   def declare(decl: Decl): Unit
+  def declareWrapped(decl: WrappedFunc) : Unit
   def comment(content: String): Unit
   def saturate(timeout: Int, comment: String): Unit
   def saturate(data: Option[Config.Z3StateSaturationTimeout]): Unit

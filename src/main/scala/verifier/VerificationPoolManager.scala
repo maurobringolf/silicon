@@ -7,13 +7,14 @@
 package viper.silicon.verifier
 
 import java.util.concurrent._
+
 import org.apache.commons.pool2.{BasePooledObjectFactory, ObjectPool, PoolUtils, PooledObject}
 import org.apache.commons.pool2.impl.{DefaultPooledObject, GenericObjectPool, GenericObjectPoolConfig}
 import viper.silicon.Config
 import viper.silicon.interfaces.VerificationResult
 import viper.silver.components.StatefulComponent
 import viper.silicon.interfaces.decider.ProverLike
-import viper.silicon.state.terms.{Decl, Term}
+import viper.silicon.state.terms.{Decl, Term, WrappedFunc}
 
 class VerificationPoolManager(master: MasterVerifier) extends StatefulComponent {
   private val numberOfSlaveVerifiers: Int = Verifier.config.numberOfParallelVerifiers()
@@ -29,6 +30,7 @@ class VerificationPoolManager(master: MasterVerifier) extends StatefulComponent 
     def assume(term: Term): Unit = slaveVerifiers foreach (_.decider.prover.assume(term))
     def declare(decl: Decl): Unit =  slaveVerifiers foreach (_.decider.prover.declare(decl))
     def comment(content: String): Unit = slaveVerifiers foreach (_.decider.prover.comment(content))
+    def declareWrapped(decl: WrappedFunc): Unit =  slaveVerifiers foreach (_.decider.prover.declareWrapped(decl))
 
     def saturate(data: Option[Config.Z3StateSaturationTimeout]): Unit =
       slaveVerifiers foreach (_.decider.prover.saturate(data))

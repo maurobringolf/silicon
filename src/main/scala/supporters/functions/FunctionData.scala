@@ -87,7 +87,7 @@ class FunctionData(val programFunction: ast.Function,
   private[this] var freshFieldInvs: InsertionOrderedSet[InverseFunctions] = InsertionOrderedSet.empty
   private[this] var freshArps: InsertionOrderedSet[(Var, Term)] = InsertionOrderedSet.empty
   private[this] var freshSnapshots: InsertionOrderedSet[Function] = InsertionOrderedSet.empty
-  private[this] var freshSymbolsAcrossAllPhases: InsertionOrderedSet[Function] = InsertionOrderedSet.empty
+  private[functions] var freshSymbolsAcrossAllPhases: InsertionOrderedSet[Function] = InsertionOrderedSet.empty
 
   private[functions] def getFreshFieldInvs: InsertionOrderedSet[InverseFunctions] = freshFieldInvs
   private[functions] def getFreshArps: InsertionOrderedSet[Var] = freshArps.map(_._1)
