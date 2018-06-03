@@ -8,6 +8,7 @@ package viper.silicon
 
 import java.text.SimpleDateFormat
 import java.util.concurrent.{Callable, Executors, TimeUnit, TimeoutException}
+
 import scala.collection.immutable
 import scala.language.postfixOps
 import scala.reflect.runtime.universe
@@ -18,12 +19,13 @@ import org.slf4j.LoggerFactory
 import viper.silver.ast
 import viper.silver.ast.NoPosition
 import viper.silver.frontend.{SilFrontend, TranslatorState}
-import viper.silver.reporter.{NoopReporter, Reporter}
+import viper.silver.reporter._
 import viper.silver.verifier.{DefaultDependency => SilDefaultDependency, Failure => SilFailure, Success => SilSuccess, TimeoutOccurred => SilTimeoutOccurred, VerificationResult => SilVerificationResult, Verifier => SilVerifier}
 import viper.silicon.common.config.Version
 import viper.silicon.interfaces.Failure
 import viper.silicon.reporting.condenseToViperResult
 import viper.silicon.verifier.DefaultMasterVerifier
+import viper.silver.logger.ViperStdOutLogger
 
 object Silicon {
   private val brandingDataObjectName = "viper.silicon.brandingData"
@@ -94,9 +96,9 @@ class Silicon(val reporter: Reporter, private var debugInfo: Seq[(String, Any)] 
     extends SilVerifier
        with LazyLogging {
 
-  def this(debugInfo: Seq[(String, Any)]) = this(NoopReporter, debugInfo)
+  def this(debugInfo: Seq[(String, Any)]) = this(StdIOReporter(), debugInfo)
 
-  def this() = this(NoopReporter, Nil)
+  def this() = this(StdIOReporter(), Nil)
 
   val name: String = Silicon.name
   val version = Silicon.version
@@ -121,6 +123,7 @@ class Silicon(val reporter: Reporter, private var debugInfo: Seq[(String, Any)] 
 
   private var startTime: Long = _
   private var elapsedMillis: Long = _
+  private def overallTime = System.currentTimeMillis() - startTime
 
   def parseCommandLine(args: Seq[String]) {
     assert(lifetimeState == LifetimeState.Instantiated, "Silicon can only be configured once")
@@ -213,7 +216,8 @@ class Silicon(val reporter: Reporter, private var debugInfo: Seq[(String, Any)] 
           /* An exception's root cause might be an error; the following code takes care of that */
           reporting.exceptionToViperError(exception) match {
             case Right((cause, failure)) =>
-              logger.debug("An exception occurred:", cause) /* Log exception if requested */
+              reporter report ExceptionReport(exception)
+              logger debug ("An exception occurred:", cause) /* Log exception if requested */
               result = Some(failure) /* Return exceptions as regular verification failures */
             case Left(error) =>
               /* Errors are rethrown (see also the try-catch block in object SiliconRunner) */
@@ -285,9 +289,8 @@ class Silicon(val reporter: Reporter, private var debugInfo: Seq[(String, Any)] 
     }
 
     failures foreach (f => logFailure(f, s => logger.debug(s)))
-
     logger.debug("Verification finished in %s with %s error(s)".format(
-        viper.silicon.common.format.formatMillisReadably(/*verifier.bookkeeper.*/elapsedMillis),
+        viper.silver.reporter.format.formatMillisReadably(/*verifier.bookkeeper.*/elapsedMillis),
         failures.length))
 
     failures
@@ -298,21 +301,24 @@ class Silicon(val reporter: Reporter, private var debugInfo: Seq[(String, Any)] 
   }
 
   private def setLogLevelsFromConfig() {
-    val level = Level.toLevel(config.logLevel())
+    config.logLevel
+      .map(Level.toLevel)
+      .foreach(level => {
+        SiliconRunner.logger.setLevel(level)
 
-    SiliconRunner.logger.setLevel(level)
+        val packageLogger = LoggerFactory.getLogger(this.getClass.getPackage.getName).asInstanceOf[Logger]
+        packageLogger.setLevel(level)
 
-    val packageLogger = LoggerFactory.getLogger(this.getClass.getPackage.getName).asInstanceOf[Logger]
-    packageLogger.setLevel(level)
-
-    config.logger.foreach { case (loggerName, loggerLevelString) =>
-      val logger = LoggerFactory.getLogger(loggerName).asInstanceOf[Logger]
-      logger.setLevel(Level.toLevel(loggerLevelString))
-    }
+        config.logger.foreach { case (loggerName, loggerLevelString) =>
+          val logger = LoggerFactory.getLogger(loggerName).asInstanceOf[Logger]
+          logger.setLevel(Level.toLevel(loggerLevelString))
+        }
+    })
   }
 }
 
-class SiliconFrontend(override val reporter: Reporter) extends SilFrontend {
+class SiliconFrontend(override val reporter: Reporter,
+                      override implicit val logger: Logger = ViperStdOutLogger("SiliconFrontend", "INFO").get) extends SilFrontend {
   protected var siliconInstance: Silicon = _
 
   def createVerifier(fullCmd: String) = {
@@ -350,7 +356,7 @@ class SiliconFrontend(override val reporter: Reporter) extends SilFrontend {
   }
 }
 
-object SiliconRunner extends SiliconFrontend(NoopReporter) {
+object SiliconRunner extends SiliconFrontend(StdIOReporter()) {
   def main(args: Array[String]) {
     var exitCode = 1 /* Only 0 indicates no error - we're pessimistic here */
 
@@ -362,18 +368,23 @@ object SiliconRunner extends SiliconFrontend(NoopReporter) {
         exitCode = 0
       }
     } catch { /* Catch exceptions and errors thrown at any point of the execution of Silicon */
-      case exception: Exception if config.verified && !config.asInstanceOf[Config].disableCatchingExceptions() =>
+      case exception: Exception
+           if config == null ||
+              (config.verified && !config.asInstanceOf[Config].disableCatchingExceptions()) =>
+
         /* An exception's root cause might be an error; the following code takes care of that */
         reporting.exceptionToViperError(exception) match {
           case Right((cause, failure)) =>
             /* Report exceptions in a user-friendly way */
-            logger.debug("An exception occurred:", cause) /* Log stack trace */
-            logger.error(failure.toString) /* Log verification failure */
-          case Left(error) =>
+            reporter report ExceptionReport(exception)
+            logger debug ("An exception occurred:", cause) /* Log stack trace */
+          case Left(error: Error) =>
             /* Errors are rethrown (see below); for particular ones, additional messages are logged */
             error match {
               case _: NoClassDefFoundError =>
-                logger.error(reporting.noClassDefFoundErrorMessage, error)
+                reporter report InternalWarningMessage(reporting.noClassDefFoundErrorMessage)
+                reporter report ExceptionReport(error)
+                logger error (reporting.noClassDefFoundErrorMessage, error)
               case _ =>
                 /* Don't do anything special */
             }
@@ -382,7 +393,9 @@ object SiliconRunner extends SiliconFrontend(NoopReporter) {
         }
       case error: NoClassDefFoundError =>
         /* Log NoClassDefFoundErrors with an additional message */
-        logger.error(reporting.noClassDefFoundErrorMessage, error)
+        reporter report InternalWarningMessage(reporting.noClassDefFoundErrorMessage)
+        reporter report ExceptionReport(error)
+        logger error (reporting.noClassDefFoundErrorMessage, error)
     } finally {
         siliconInstance.stop()
         /* TODO: This currently seems necessary to make sure that Z3 is terminated
