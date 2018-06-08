@@ -9,7 +9,7 @@ package viper.silicon.supporters.functions
 import java.io._
 import java.nio.file.Files
 
-import ch.qos.logback.classic.Logger
+import com.typesafe.scalalogging.Logger
 
 import scala.collection.JavaConversions._
 import viper.silver.ast
@@ -28,8 +28,6 @@ import viper.silicon.decider.{Decider, DefaultDeciderProvider, Z3ProverStdIO}
 import viper.silicon.rules.{consumer, evaluator, executionFlowController, producer}
 import viper.silicon.verifier.{Verifier, VerifierComponent}
 import viper.silicon.utils.toSf
-
-
 
 trait FunctionVerificationUnit[SO, SY, AX]
     extends VerifyingPreambleContributor[SO, SY, AX, ast.Function]
