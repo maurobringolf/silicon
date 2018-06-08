@@ -6,6 +6,8 @@
 
 package viper.silicon.state.terms
 
+import sun.reflect.generics.reflectiveObjects.NotImplementedException
+
 import scala.reflect.ClassTag
 import viper.silver.ast.utility.Visitor
 import viper.silicon.common.collections.immutable.InsertionOrderedSet
@@ -136,13 +138,13 @@ class Fun(val id: Identifier, val argSorts: Seq[Sort], val resultSort: Sort)
 
 case class WrappedFunc(val decl : String) extends Function {
   override def argSorts() = {
-    throw new  NotImplementedException()
+    ???
   }
   override def resultSort() = {
-    throw new  NotImplementedException()
+    ???
   }
   override def id() = {
-    throw new  NotImplementedException()
+    ???
   }
 }
 
@@ -1757,7 +1759,7 @@ case class MagicWandSnapshot(abstractLhs: Term, rhsSnapshot: Term) extends Combi
   utils.assertSort(abstractLhs, "abstract lhs", sorts.Snap)
   utils.assertSort(rhsSnapshot, "rhs", sorts.Snap)
 
-  override val toString = s"wandSnap(lhs = $abstractLhs, rhs = $rhsSnapshot)"
+  override lazy val toString = s"wandSnap(lhs = $abstractLhs, rhs = $rhsSnapshot)"
 
   def merge(other: MagicWandSnapshot, branchConditions: Stack[Term]): MagicWandSnapshot = {
     assert(this.abstractLhs == other.abstractLhs)

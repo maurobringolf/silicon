@@ -236,12 +236,12 @@ trait DefaultFunctionVerificationUnitProvider extends VerifierComponent { v: Ver
           val lines = Files.readAllLines(java.nio.file.Paths.get(path));
 
           var linelines : Seq[String] = Seq()
-          var current = ""
+          var current = new StringBuilder()
           for (line <- lines){
-            current = current + line
+            current.append(line)
             if (line == ""){
-              linelines = linelines ++ Seq(current)
-              current = ""
+              linelines = linelines ++ Seq(current.toString())
+              current = new StringBuilder()
             }
           }
 
