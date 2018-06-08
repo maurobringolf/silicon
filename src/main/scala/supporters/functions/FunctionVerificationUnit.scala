@@ -10,8 +10,6 @@ import java.io._
 import java.nio.file.Files
 
 import ch.qos.logback.classic.Logger
-import com.fasterxml.jackson.databind.{DeserializationFeature, ObjectMapper, SerializationFeature}
-import com.fasterxml.jackson.module.scala.DefaultScalaModule
 
 import scala.collection.JavaConversions._
 import viper.silver.ast
@@ -159,10 +157,13 @@ trait DefaultFunctionVerificationUnitProvider extends VerifierComponent { v: Ver
       val s = sInit.copy(functionRecorder = ActualFunctionRecorder(data), conservingSnapshotGeneration = true)
       val lenEmitted = emittedFunctionAxioms.length
 
+      val now = System.currentTimeMillis()
+
       /* Phase 1: Check well-definedness of the specifications */
       checkSpecificationWelldefinedness(s, function) match {
         case (result1: FatalResult, _) =>
           data.verificationFailures = data.verificationFailures :+ result1
+          println("Phase 1 function " + function.name + ": " + (System.currentTimeMillis() - now))
 
           result1
 
@@ -171,6 +172,8 @@ trait DefaultFunctionVerificationUnitProvider extends VerifierComponent { v: Ver
           emitAndRecordFunctionAxioms(data.triggerAxiom)
           emitAndRecordFunctionAxioms(data.postAxiom.toSeq: _*)
 
+          val between = System.currentTimeMillis()
+          println("Phase 1 function " + function.name + ": " + (between - now))
           if (function.body.isEmpty) {
             if (Verifier.config.functionCache.isDefined) {
               val name = function.name + "@" + function.toString().hashCode.toString + ".func"
@@ -196,9 +199,11 @@ trait DefaultFunctionVerificationUnitProvider extends VerifierComponent { v: Ver
 
             result2 match {
               case fatalResult: FatalResult =>
+                println("Phase 2 function " + function.name + ": " + (System.currentTimeMillis() - between))
                 data.verificationFailures = data.verificationFailures :+ fatalResult
               case _ =>
                 emitAndRecordFunctionAxioms(data.definitionalAxiom.toSeq: _*)
+                println("Phase 2 function " + function.name + ": " + (System.currentTimeMillis() - between))
                 if (Verifier.config.functionCache.isDefined){
                   val name = function.name + "@" + function.toString().hashCode.toString + ".func"
                   val path: String = Verifier.config.functionCache.toOption.get + File.separator + name

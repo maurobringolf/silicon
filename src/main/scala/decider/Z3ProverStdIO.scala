@@ -21,7 +21,7 @@ import viper.silicon.verifier.Verifier
 import viper.silver.reporter.{ConfigurationConfirmation, InternalWarningMessage, Reporter}
 
 class Z3ProverStdIO(uniqueId: String,
-                    termConverter: TermToSMTLib2Converter,
+                    val termConverter: TermToSMTLib2Converter,
                     identifierFactory: IdentifierFactory,
                     reporter: Reporter)
     extends Prover

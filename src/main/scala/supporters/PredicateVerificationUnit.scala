@@ -97,6 +97,7 @@ trait DefaultPredicateVerificationUnitProvider extends VerifierComponent { v: Ve
     }
 
     private def doVerify(sInit: State, predicate: ast.Predicate): Seq[VerificationResult] = {
+      val now = System.currentTimeMillis()
       val ins = predicate.formalArgs.map(_.localVar)
       val s = sInit.copy(g = Store(ins.map(x => (x, decider.fresh(x)))),
         h = Heap(),
@@ -110,8 +111,11 @@ trait DefaultPredicateVerificationUnitProvider extends VerifierComponent { v: Ve
           /*    locallyXXX {
                 magicWandSupporter.checkWandsAreSelfFraming(σ.γ, σ.h, predicate, c)}
           &&*/  executionFlowController.locally(s, v)((s1, _) => {
-          produce(s1, freshSnap, body, err, v)((_, _) =>
-            Success())})
+          produce(s1, freshSnap, body, err, v)((_, _) =>{
+            println("Predicate " + predicate.name + ": " + (System.currentTimeMillis() - now))
+            Success()
+          }
+            )})
       }
 
       Seq(result)
