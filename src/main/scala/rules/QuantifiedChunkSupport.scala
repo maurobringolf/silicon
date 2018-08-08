@@ -724,8 +724,8 @@ object quantifiedChunkSupporter extends QuantifiedChunkSupport with Immutable {
     val precomputedData = candidates map { ch =>
       val permsProvided = ch.perm
       val permsTakenBody = Ite(condition, PermMin(permsProvided, permsNeeded), NoPerm())
-      val permsTakenMacro = v.decider.freshMacro("pTaken", codomainQVars, permsTakenBody)
-      val permsTaken = App(permsTakenMacro, codomainQVars)
+      //val permsTakenMacro = v.decider.freshMacro("pTaken", codomainQVars, permsTakenBody)
+      val permsTaken = permsTakenBody //App(permsTakenMacro, codomainQVars)
 
       permsNeeded = PermMinus(permsNeeded, permsTaken)
 

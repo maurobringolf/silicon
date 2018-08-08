@@ -174,6 +174,7 @@ class DefaultMasterVerifier(config: Config, override val reporter: Reporter)
     /* TODO: A workaround for Silver issue #94. toList must be before flatMap.
      *       Otherwise Set will be used internally and some error messages will be lost.
      */
+    val beforeFuncs = System.currentTimeMillis()
     val functionVerificationResults = functionsSupporter.units.toList flatMap (function => {
       val startTime = System.currentTimeMillis()
       val results = functionsSupporter.verify(createInitialState(function, program), function)
@@ -182,6 +183,7 @@ class DefaultMasterVerifier(config: Config, override val reporter: Reporter)
       logger debug s"Silicon finished verification of function `${function.name}` in ${viper.silver.reporter.format.formatMillisReadably(elapsed)} seconds with the following result: ${condenseToViperResult(results).toString}"
       results
     })
+    val funcsPreds = System.currentTimeMillis()
 
     val predicateVerificationResults = predicateSupporter.units.toList flatMap (predicate => {
       val startTime = System.currentTimeMillis()
@@ -191,7 +193,7 @@ class DefaultMasterVerifier(config: Config, override val reporter: Reporter)
       logger debug s"Silicon finished verification of predicate `${predicate.name}` in ${viper.silver.reporter.format.formatMillisReadably(elapsed)} seconds with the following result: ${condenseToViperResult(results).toString}"
       results
     })
-
+    val afterPreds = System.currentTimeMillis()
     decider.prover.stop()
 
     _verificationPoolManager.pooledVerifiers.comment("-" * 60)
@@ -205,6 +207,7 @@ class DefaultMasterVerifier(config: Config, override val reporter: Reporter)
     _verificationPoolManager.pooledVerifiers.comment("End function- and predicate-related preamble")
     _verificationPoolManager.pooledVerifiers.comment("-" * 60)
 
+    val beforeMethods = System.currentTimeMillis()
     val verificationTaskFutures: Seq[Future[Seq[VerificationResult]]] =
       program.methods.filterNot(excludeMethod).map(method => {
         val s = createInitialState(method, program)/*.copy(parallelizeBranches = true)*/ /* [BRANCH-PARALLELISATION] */
@@ -222,11 +225,16 @@ class DefaultMasterVerifier(config: Config, override val reporter: Reporter)
       })
 
     val methodVerificationResults = verificationTaskFutures.flatMap(_.get())
+    val afterMethods = System.currentTimeMillis()
 
     /** Write JavaScript-Representation of the log if the SymbExLogger is enabled */
     SymbExLogger.writeJSFile()
     /** Write DOT-Representation of the log if the SymbExLogger is enabled */
     SymbExLogger.writeDotFile()
+
+    println("Total function verification time: " + (funcsPreds - beforeFuncs))
+    println("Total predicate verification time: " + (afterPreds - funcsPreds))
+    println("Total function verification time: " + (afterMethods - beforeMethods))
 
     (   functionVerificationResults
      ++ predicateVerificationResults
