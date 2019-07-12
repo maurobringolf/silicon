@@ -31,7 +31,16 @@ class DefaultSymbolConverter extends SymbolConverter with Immutable {
     case ast.SeqType(elementType) => sorts.Seq(toSort(elementType))
     case ast.SetType(elementType) => sorts.Set(toSort(elementType))
     case ast.MultisetType(elementType) => sorts.Multiset(toSort(elementType))
-
+//    case viper.silver.plugin.FlowsPlugin.FlowDomainTypeVarDecl(_,typ) => typ match {
+//      case ast.Bool => sorts.Bool
+//      case ast.Int => sorts.Int
+//      case ast.Perm => sorts.Perm
+//      case ast.Ref => sorts.Ref
+//
+//      case ast.SeqType(elementType) => sorts.Seq(toSort(elementType))
+//      case ast.SetType(elementType) => sorts.Set(toSort(elementType))
+//      case ast.MultisetType(elementType) => sorts.Multiset(toSort(elementType))
+//    }
     case dt: ast.DomainType =>
       assert(dt.isConcrete, "Expected only concrete domain types, but found " + dt)
       sorts.UserSort(Identifier(dt.toString()))
