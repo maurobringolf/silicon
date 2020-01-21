@@ -108,7 +108,7 @@ class VerificationPoolManager(master: MasterVerifier) extends StatefulComponent 
 
         task(slave)
       } finally {
-        if (slave != null) {
+        if (slave != null) {  // Comparison with null shouldn't be done, this is not Scala, but rather Java
           slaveVerifierPool.returnObject(slave)
         }
       }

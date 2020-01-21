@@ -396,10 +396,13 @@ object quantifiedChunkSupporter extends QuantifiedChunkSupport with Immutable {
           assert(codomainQVars.length == 1)
           SetIn(codomainQVars.head, domain(field.name, sm))
         case predicate: ast.Predicate =>
-          SetIn(codomainQVars
-                  .map(_.convert(sorts.Snap))
-                  .reduceLeft(Combine),
-                domain(predicate.name, sm))
+          if (codomainQVars.nonEmpty)
+            SetIn(codomainQVars
+                    .map(_.convert(sorts.Snap))
+                    .reduceLeft(Combine), // Unit, or return false
+                  domain(predicate.name, sm))
+          else
+            False()  // False()
         case wand: ast.MagicWand =>
           val subexpressionsToEvaluate = wand.subexpressionsToEvaluate(Verifier.program)
           val numLhs = wand.left.shallowCollect({
