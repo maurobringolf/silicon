@@ -1688,14 +1688,44 @@ object Second extends (Term => Term) {
 
 sealed trait PHeapTerm extends Term { override val sort = sorts.PHeap }
 
-case class PHeapCombine(h1: Term, h2: Term) extends PHeapTerm
-case class PHeapLookupField(field: String, sort: Sort, h: Term, at: Term) extends Term
-case class PHeapLookupPredicate(predicate: String, h: Term, args: Seq[Term]) extends PHeapTerm
+case class PHeapCombine(val h1: Term, val h2: Term) extends PHeapTerm
+
+object PHeapCombine extends ((Term, Term) => Term) {
+  def apply(h1: Term, h2: Term) : Term = (h1,h2) match {
+    case (predef.Emp, h2) => h2
+    case (h1, predef.Emp) => h1
+    case (_,_) => new PHeapCombine(h1,h2)
+  }
+
+  def unappyl(c: PHeapCombine) = Some((c.h1, c.h2))
+}
+
+case class PHeapLookupField(val field: String, val sort: Sort, val h: Term, val at: Term) extends Term
+
+object PHeapLookupField extends ((String, Sort, Term, Term) => Term) {
+  def apply(field: String, sort: Sort, h: Term, at: Term) = h match {
+    case PHeapSingletonField(`field`, `at`, v) => v
+    case _ => new PHeapLookupField(field, sort, h, at)
+  }
+
+  def unapply(lk: PHeapLookupField) = Some((lk.field, lk.sort, lk.h, lk.at))
+}
+
+class PHeapLookupPredicate(val predicate: String, val h: Term, val args: Seq[Term]) extends PHeapTerm
+
+object PHeapLookupPredicate extends ((String, Term, Seq[Term]) => Term) {
+  def apply(predicate: String, h: Term, args: Seq[Term]) = h match {
+    case PHeapSingletonPredicate(`predicate`, `args`, hp) => hp
+    case _ => new PHeapLookupPredicate(predicate, h, args)
+  }
+
+  def unapply(lk: PHeapLookupPredicate) = Some((lk.predicate, lk.h, lk.args))
+}
+
 case class PHeapRemovePredicate(predicate: String, h: Term, args: Seq[Term]) extends PHeapTerm
 case class PHeapSingletonField(field: String, x: Term, v: Term) extends PHeapTerm
 case class PHeapSingletonPredicate(predicate: String, args: Seq[Term], h: Term) extends PHeapTerm
 case class PHeapRestrict(fun: String, snap: Term, args: Seq[Term]) extends PHeapTerm
-
 
 /* Quantified permissions */
 
