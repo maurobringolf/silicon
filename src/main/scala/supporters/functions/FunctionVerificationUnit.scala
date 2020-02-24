@@ -214,7 +214,6 @@ trait DefaultFunctionVerificationUnitProvider extends VerifierComponent { v: Ver
           // The postcondition must be produced with a fresh snapshot (different from `?h`) because
           // the postcondition's snapshot structure is most likely different than that of the
           // precondition
-          // TODO: Use a fresh snapshot variable instead of `?h` here
           produces(s1, v.decider.fresh(sorts.PHeap), posts, ContractNotWellformed, v)((s2, _) => {
             recorders :+= s2.functionRecorder
             Success()})})})
