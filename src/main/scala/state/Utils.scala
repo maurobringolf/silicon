@@ -8,8 +8,38 @@ package viper.silicon.state
 
 import scala.collection.mutable
 import viper.silicon.state.terms._
+import viper.silicon.verifier.Verifier
 
 package object utils {
+
+  def projectHeapDeps(q : Quantification, v: Verifier) : Quantification = {
+
+    def computeHeapDeps(t: Term) : Seq[Term] = t match {
+      case App(_, args) => args.flatMap(computeHeapDeps)
+      case PHeapLookupField(f, s, h, at) => Seq(t)
+      case _ => Seq()
+    }
+
+    def replaceHeapDeps(t: Term, m: Map[Term, Var]) : Term = t match {
+      case App(f, args) => App(f, args.map(replaceHeapDeps(_,m)))
+      case PHeapLookupField(f, s, h, at) => (m get t).get
+      case _ => t
+    }
+
+    val (projTriggers, projVarss) = q.triggers
+                    .map(({ case Trigger(ts) => (ts, ts.flatMap(computeHeapDeps))}))
+                    .distinct
+                    .map({ case (ts, deps) => (ts, deps.map(t => (t, v.decider.fresh(t.sort))).toMap)})
+                    .map({ case (ts, m) => (Trigger(ts.map(replaceHeapDeps(_,m))), m.values.toSeq)}).unzip
+
+    Quantification(q.q,
+                   q.vars ++ projVarss.flatten,
+                   q.body,
+                   projTriggers,
+                   q.name,
+                   q.isGlobal)
+  }
+
   /** Note: the method accounts for `ref` occurring in `σ`, i.e. it will not generate the
     * unsatisfiable constraint `ref != ref`.
     */

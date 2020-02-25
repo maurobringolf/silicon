@@ -14,6 +14,7 @@ import viper.silver.verifier.reasons._
 import viper.silicon.common.collections.immutable.InsertionOrderedSet
 import viper.silicon.interfaces._
 import viper.silicon.state._
+import viper.silicon.state.utils.projectHeapDeps
 import viper.silicon.state.terms._
 import viper.silicon.state.terms.implicits._
 import viper.silicon.state.terms.perms.{IsNonNegative, IsPositive}
@@ -602,6 +603,8 @@ object evaluator extends EvaluationRules with Immutable {
         evalQuantified(s, qantOp, eQuant.variables, Nil, Seq(body), Some(eTriggers), name, pve, v){
           case (s1, tVars, _, Seq(tBody), tTriggers, (tAuxGlobal, tAux), v1) =>
 
+            val tAuxProj = tAux.map(projectHeapDeps((_: Quantification), v1))
+
             val tlqGlobal = tAuxGlobal flatMap (q1 => q1.deepCollect {case q2: Quantification if !q2.existsDefined {case v: Var if q1.vars.contains(v) => } => q2})
             val tlq = tAux flatMap (q1 => q1.deepCollect {case q2: Quantification if !q2.existsDefined {case v: Var if q1.vars.contains(v) => } => q2})
 
@@ -610,7 +613,7 @@ object evaluator extends EvaluationRules with Immutable {
             v1.decider.prover.comment("Nested auxiliary terms: globals (tlq)")
             v1.decider.assume(tlqGlobal)
             v1.decider.prover.comment("Nested auxiliary terms: non-globals (aux)")
-            v1.decider.assume(tAux)
+            v1.decider.assume(tAuxProj)
             v1.decider.prover.comment("Nested auxiliary terms: non-globals (tlq)")
             v1.decider.assume(tlq)
 
