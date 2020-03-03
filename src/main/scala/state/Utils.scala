@@ -15,14 +15,16 @@ package object utils {
   def projectHeapDeps(q : Quantification, v: Verifier) : Quantification = {
 
     def computeHeapDeps(t: Term) : Seq[Term] = t match {
-      case App(_, args) => args.flatMap(computeHeapDeps)
+      case App(HeapDepFun(_,_,_), args) => args.flatMap(computeHeapDeps)
       case PHeapLookupField(f, s, h, at) => Seq(t)
+      case PHeapSingletonPredicate(p, args, h) => Seq(t)
       case _ => Seq()
     }
 
     def replaceHeapDeps(t: Term, m: Map[Term, Var]) : Term = t match {
       case App(f, args) => App(f, args.map(replaceHeapDeps(_,m)))
       case PHeapLookupField(f, s, h, at) => (m get t).get
+      case PHeapSingletonPredicate(p, args, h) => (m get t).get
       case _ => t
     }
 
