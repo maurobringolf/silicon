@@ -12,8 +12,10 @@ import viper.silicon.verifier.Verifier
 
 package object utils {
 
-  def projectHeapDeps(q : Quantification, v: Verifier) : Quantification = {
-
+  // Applies a simple search-and-replace strategy to project heap dependencies of a trigger to quantified variables
+  // Splits the quantifier per trigger
+  def projectHeapDeps(q : Quantification, v: Verifier) : Seq[Quantification] = {
+    
     def computeHeapDeps(t: Term) : Seq[Term] = t match {
       case App(HeapDepFun(_,_,_), args) => args.flatMap(computeHeapDeps)
       case PHeapLookupField(f, s, h, at) => Seq(t)
@@ -28,18 +30,24 @@ package object utils {
       case _ => t
     }
 
-    val (projTriggers, projVarss) = q.triggers
-                    .map(({ case Trigger(ts) => (ts, ts.flatMap(computeHeapDeps))}))
-                    .distinct
-                    .map({ case (ts, deps) => (ts, deps.map(t => (t, v.decider.fresh(t.sort))).toMap)})
-                    .map({ case (ts, m) => (Trigger(ts.map(replaceHeapDeps(_,m))), m.values.toSeq)}).unzip
+    // TODO: Keep all heap-independent triggers under one quantifier instead of splitting
+    q.triggers
+      // : Seq[Trigger]
+      // Find heap dependencies for each trigger separately
+      .map(({ case Trigger(ts) => (ts, ts.flatMap(computeHeapDeps))}))
+      .distinct
+      // : Seq[(Trigger, Seq[Term])]
+      // Map all heap dependencies to fresh variables
+      .map({ case (ts, deps) => (ts, deps.map(t => (t, v.decider.fresh("proj", t.sort))).toMap)})
+      // : Seq[(Trigger, Map[Term, Var])]
+      // For each trigger, create a new quantifier where all heap dependencies are replaced with the new variables
+      .map({ case (ts, m) => Quantification(q.q,
+              q.vars ++ m.values.toSeq,
+              q.body,
+              Seq(Trigger(ts.map(replaceHeapDeps(_,m)))), 
+              q.name,
+              q.isGlobal)})
 
-    Quantification(q.q,
-                   q.vars ++ projVarss.flatten,
-                   q.body,
-                   projTriggers,
-                   q.name,
-                   q.isGlobal)
   }
 
   /** Note: the method accounts for `ref` occurring in `σ`, i.e. it will not generate the
