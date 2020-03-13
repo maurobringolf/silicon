@@ -54,6 +54,7 @@
 (assert (forall ((s0 $Seq<$S$>) (s1 $Seq<$S$>) (n Int) ) (!
   (implies ; The implication was not in the Dafny version
     (and
+      (<= 0 n)
       (not (= s0 $Seq.empty<$S$>))
       (not (= s1 $Seq.empty<$S$>)))
     (and
