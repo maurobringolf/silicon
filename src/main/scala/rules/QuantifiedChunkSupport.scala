@@ -1075,7 +1075,12 @@ object quantifiedChunkSupporter extends QuantifiedChunkSupport with Immutable {
               v = v)
           val s2 = s1.copy(functionRecorder = s1.functionRecorder.recordFvfAndDomain(smDef1),
                            smCache = smCache1)
-          val snap = ResourceLookup(resource, smDef1.sm, arguments).convert(sorts.Snap)
+          val snapVal = ResourceLookup(resource, smDef1.sm, arguments)
+          val snap = resource match {
+            case field: ast.Field => PHeapSingletonField(field.name, arguments.head, snapVal)
+            //case _: ast.Predicate | _: ast.MagicWand => PredicateDomain
+            case other => sys.error(s"Not implemented")
+          }
           Q(s2, h1, snap, v)
         case (Incomplete(_), _, _) =>
           failure
