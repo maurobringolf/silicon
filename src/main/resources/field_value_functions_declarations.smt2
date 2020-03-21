@@ -12,3 +12,6 @@
 (declare-fun $FVF.loc_$FLD$ ($S$ $Ref) Bool)
 (declare-fun $FVF.perm_$FLD$ ($FPM $Ref) $Perm)
 (declare-const $fvfTOP_$FLD$ $FVF<$S$>)
+
+(declare-fun $FVF.toPHeap_$FLD$ ($FVF<$S$>) PHeap)
+(declare-fun PHeap.toFVF_$FLD$ (PHeap) $FVF<$S$>)

@@ -233,6 +233,10 @@ class TermToSMTLib2Converter
 
     case Domain(id, fvf) => parens(text("$FVF.domain_") <> id <+> render(fvf))
 
+    case FVFToPHeap(id, fvf) => parens(text("$FVF.toPHeap_") <> id <+> render(fvf))
+
+    case PHeapToFVF(field, fieldSort, h) => parens(text("PHeap.toFVF_") <> field <+> render(h))
+
     case Lookup(field, fvf, at) => //fvf.sort match {
 //      case _: sorts.PartialFieldValueFunction =>
         parens(text("$FVF.lookup_") <> field <+> render(fvf) <+> render(at))

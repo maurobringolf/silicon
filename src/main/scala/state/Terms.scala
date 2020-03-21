@@ -1729,6 +1729,16 @@ case class PHeapRestrict(fun: String, snap: Term, args: Seq[Term]) extends PHeap
 
 /* Quantified permissions */
 
+case class FVFToPHeap(field: String, fvf: Term) extends Term {
+  utils.assertSort(fvf, "field value function", "FieldValueFunction", _.isInstanceOf[sorts.FieldValueFunction])
+  val sort = sorts.PHeap
+}
+
+case class PHeapToFVF(field: String, fieldSort: Sort, h: Term) extends Term {
+  utils.assertSort(h, "PHeap", sorts.PHeap)
+  val sort = sorts.FieldValueFunction(fieldSort)
+}
+
 case class Lookup(field: String, fvf: Term, at: Term) extends Term {
   utils.assertSort(fvf, "field value function", "FieldValueFunction", _.isInstanceOf[sorts.FieldValueFunction])
   utils.assertSort(at, "receiver", sorts.Ref)

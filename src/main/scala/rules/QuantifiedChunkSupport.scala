@@ -923,8 +923,8 @@ object quantifiedChunkSupporter extends QuantifiedChunkSupport with Immutable {
                 (result, s4, h2, Some(consumedChunk))
               })((s4, optCh, v3) =>
                 optCh match {
-                  case Some(ch) => Q(s4, s4.h, ch.snapshotMap.convert(sorts.Snap), v3)
-                  case _ => Q(s4, s4.h, v3.decider.fresh(sorts.Snap), v3)
+                  case Some(ch) => Q(s4, s4.h, FVFToPHeap(qid, ch.snapshotMap), v3)
+                  case _ => Q(s4, s4.h, v3.decider.fresh(sorts.PHeap), v3)
                 }
               )
             } else {
@@ -954,7 +954,7 @@ object quantifiedChunkSupporter extends QuantifiedChunkSupport with Immutable {
                                    partiallyConsumedHeap = Some(h3),
                                    constrainableARPs = s.constrainableARPs,
                                    smCache = smCache2)
-                  Q(s3, h3, smDef2.sm.convert(sorts.Snap), v)
+                  Q(s3, h3, FVFToPHeap(qid, smDef2.sm), v)
                 case (Incomplete(_), _, _) =>
                   Failure(pve dueTo insufficientPermissionReason)}
             }

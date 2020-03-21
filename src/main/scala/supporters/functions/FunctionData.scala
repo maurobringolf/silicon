@@ -163,9 +163,9 @@ class FunctionData(val programFunction: ast.Function,
   }
 
   private def generateNestedDefinitionalAxioms: InsertionOrderedSet[Term] = (
-       freshFieldInvs.flatMap(_.definitionalAxioms)
-    ++ freshFvfsAndDomains.flatMap (fvfDef => fvfDef.domainDefinitions ++ fvfDef.valueDefinitions)
-    ++ freshArps.map(_._2)
+    //   freshFieldInvs.flatMap(_.definitionalAxioms)
+    //++ freshFvfsAndDomains.flatMap (fvfDef => fvfDef.domainDefinitions ++ fvfDef.valueDefinitions)
+    freshArps.map(_._2)
   )
 
   /*
