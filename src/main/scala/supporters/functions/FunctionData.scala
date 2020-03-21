@@ -8,6 +8,7 @@ package viper.silicon.supporters.functions
 
 import viper.silver.ast
 import viper.silver.ast.utility.Functions
+import viper.silver.ast.utility.QuantifiedPermissions.QuantifiedPermissionAssertion
 import viper.silicon.common.collections.immutable.InsertionOrderedSet
 import viper.silicon.interfaces.FatalResult
 import viper.silicon.rules.{InverseFunctions, SnapshotMapDefinition, functionSupporter}
@@ -100,6 +101,10 @@ class FunctionData(val programFunction: ast.Function,
       translatePreconditionToDomain(e.whenExhaling)
     case ast.Let(v,e,body) =>
       translatePreconditionToDomain(body.replace(v.localVar, e))
+    case QuantifiedPermissionAssertion(forall, cond, acc: ast.FieldAccessPredicate) => {
+      // TODO
+      predef.Emp
+    }
     case a =>
       if (a.isPure) predef.Emp else sys.error("Cannot translatePreconditionToDomain() of " + a.toString + " of type " + a.getClass)
   }
