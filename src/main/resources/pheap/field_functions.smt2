@@ -15,3 +15,22 @@
 (assert (Set_equal
 	(PHeap.dom_$FLD$ PHeap.emp)
 	(as Set_empty Set<$Ref>)))
+
+; TODO: Move all embedding related things to a separate file
+(declare-fun $FVF.toPHeap_$FLD$ ($FVF<$S$>) PHeap)
+(declare-fun PHeap.toFVF_$FLD$ (PHeap) $FVF<$S$>)
+
+(assert (forall ((fvf $FVF<$S$>) (x $Ref)) (!
+    (=
+        ($FVF.lookup_$FLD$ fvf x)
+        (PHeap.lookup_$FLD$ ($FVF.toPHeap_$FLD$ fvf) x)
+    )
+    :pattern ((PHeap.lookup_$FLD$ ($FVF.toPHeap_$FLD$ fvf) x)))))
+
+(assert (forall ((fvf $FVF<$S$>) (x $Ref)) (!
+    (=
+        (Set_in x ($FVF.domain_$FLD$ fvf))
+        (Set_in x (PHeap.dom_$FLD$ ($FVF.toPHeap_$FLD$ fvf)))
+    )
+    :pattern ((Set_in x (PHeap.dom_$FLD$ ($FVF.toPHeap_$FLD$ fvf)))))))
+
