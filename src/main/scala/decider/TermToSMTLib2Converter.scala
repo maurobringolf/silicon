@@ -216,7 +216,7 @@ class TermToSMTLib2Converter
     /* PHeaps */
 
     case PHeapLookupField(f, _, h, x) => parens(text("PHeap.lookup_") <> f <+> render(h) <+> render(x))
-    case PHeapFieldDomain(f, _, h) => parens(text("PHeap.dom_") <> f <+> render(h))
+    case PHeapFieldDomain(f, h) => parens(text("PHeap.dom_") <> f <+> render(h))
     case PHeapLookupPredicate(p, h, args) => parens(text("PHeap.lookup_") <> p <+> render(h) <+> (
       if (args.length > 0) {
         parens(text("PHeap.loc_") <> p <+> args.map(a => convert(a)).mkString(" "))
