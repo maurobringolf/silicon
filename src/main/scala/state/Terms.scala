@@ -1711,6 +1711,17 @@ object PHeapLookupField extends ((String, Sort, Term, Term) => Term) {
   def unapply(lk: PHeapLookupField) = Some((lk.field, lk.sort, lk.h, lk.at))
 }
 
+case class PHeapFieldDomain(val field: String, val sort: Sort, val h: Term) extends Term
+
+object PHeapFieldDomain extends ((String, Sort, Term) => Term) {
+  def apply(field: String, sort: Sort, h: Term) = h match {
+    // TODO syntactic optimization
+    case _ => new PHeapFieldDomain(field, sort, h)
+  }
+
+  def unapply(lk: PHeapFieldDomain) = Some((lk.field, lk.sort, lk.h))
+}
+
 class PHeapLookupPredicate(val predicate: String, val h: Term, val args: Seq[Term]) extends PHeapTerm
 
 object PHeapLookupPredicate extends ((String, Term, Seq[Term]) => Term) {

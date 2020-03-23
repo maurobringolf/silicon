@@ -744,8 +744,11 @@ object quantifiedChunkSupporter extends QuantifiedChunkSupport with Immutable {
                             v: Verifier)
                            (Q: (State, Verifier) => VerificationResult)
                            : VerificationResult = {
-
-    val (sm, smValueDef) = quantifiedChunkSupporter.singletonSnapshotMap(s, resource, tArgs, tSnap, v)
+    val value = resource match {
+      case field: ast.Field => PHeapLookupField(field.name, v.symbolConverter.toSort(field.typ), tSnap, tArgs.head)
+      case _ => sys.error("not implemented")
+    }
+    val (sm, smValueDef) = quantifiedChunkSupporter.singletonSnapshotMap(s, resource, tArgs, value, v)
     v.decider.prover.comment("Definitional axioms for singleton-SM's value")
     val definitionalAxiomMark = v.decider.setPathConditionMark()
     v.decider.assume(smValueDef)
