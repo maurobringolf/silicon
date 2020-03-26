@@ -105,7 +105,7 @@ trait DefaultFunctionVerificationUnitProvider extends VerifierComponent { v: Ver
     private def generateFunctionSymbolsAfterAnalysis: Iterable[Either[String, Decl]] = (
          Seq(Left("Declaring symbols related to program functions (from program analysis)"))
       ++ functionData.values.flatMap(data =>
-            Seq(data.function, data.limitedFunction, data.statelessFunction, data.restrictHeapFunction).map(FunctionDecl)
+            (data.qpInverses ++ Seq(data.function, data.limitedFunction, data.statelessFunction, data.restrictHeapFunction)).map(FunctionDecl)
          ).map(Right(_))
     )
 
@@ -172,6 +172,8 @@ trait DefaultFunctionVerificationUnitProvider extends VerifierComponent { v: Ver
           emitAndRecordFunctionAxioms(data.restrictHeapAxiom)
           emitAndRecordFunctionAxioms(data.postAxiom.toSeq: _*)
           this.postConditionAxioms = this.postConditionAxioms ++ data.postAxiom.toSeq
+
+          data.qpInversesAxioms.map(ax => emitAndRecordFunctionAxioms(ax))
 
           if (function.body.isEmpty)
             result1

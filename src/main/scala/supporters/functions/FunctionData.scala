@@ -49,6 +49,11 @@ class FunctionData(val programFunction: ast.Function,
   val statelessFunction = functionSupporter.statelessVersion(function)
   val restrictHeapFunction = functionSupporter.restrictHeapFunction(function)
 
+  lazy val qpInversesMap : QPinvMap = getQPInversesMap(programFunction.pres.reduce((p1,p2) => ast.And(p1,p2)()))
+
+  def qpInverses : Seq[Fun] = qpInversesMap.map(_._2._1).toSeq
+  def qpInversesAxioms : Seq[Term] = qpInversesMap.map(_._2._2).toSeq
+
   val formalArgs: Map[ast.AbstractLocalVar, Var] = toMap(
     for (arg <- programFunction.formalArgs;
          x = arg.localVar)
@@ -75,13 +80,84 @@ class FunctionData(val programFunction: ast.Function,
 
   val triggerAxiom =
     Forall(arguments, triggerFunctionApplication, Trigger(limitedFunctionApplication), s"triggerAxiom [${function.id.name}]")
+
+  // TODO explain
+  type QPinvMap = Map[ast.Position, (Fun, Term)]
+  // TODO explain
+  type FieldDomMap = Map[ast.Field, Var => Term]
   
   def restrictHeapAxiom() : Term = {
-    val dom = if (programFunction.pres.isEmpty) predef.Emp else programFunction.pres.map(pre => {
-      translatePreconditionToDomain(pre)
-    }).reduce((h1, h2) => PHeapCombine(h1,h2))
+    val pre = programFunction.pres.reduce((p1,p2) => ast.And(p1,p2)())
+    val fieldDoms : FieldDomMap = getFieldDoms(pre)
 
-    Forall(arguments, restrictHeapApplication === dom, Trigger(restrictHeapApplication), s"restrictHeapAxiom [${function.id.name}]")
+    fieldDoms.iterator.map({ case (ast.Field(name, typ), dom) => {
+      val x = Var(identifierFactory.fresh("x"), sorts.Ref)
+      val fSort = symbolConverter.toSort(typ)
+      Forall( x +: arguments
+            , And( SetIn(x, PHeapFieldDomain(name, restrictHeapApplication)) === dom(x)
+                 , Implies(dom(x), PHeapLookupField(name, fSort, restrictHeapApplication, x) === PHeapLookupField(name, fSort, `?h`, x)))
+            , Seq(Trigger(
+                //SetIn(x, PHeapFieldDomain(name, restrictHeapApplication)))
+                PHeapLookupField(name, symbolConverter.toSort(typ), restrictHeapApplication, x)
+              ))
+            , s"restrictHeapAxiom_dom_${name}[${function.id.name}]"
+      )
+    }}).foldLeft[Term](True())((d1,d2) => And(d1,d2))
+  }
+
+  def getQPInversesMap(pre: ast.Exp): QPinvMap = pre match {
+    case ast.And(e1,e2) => getQPInversesMap(e1) ++ getQPInversesMap(e2)
+    case node@QuantifiedPermissionAssertion(forall,cond,ast.FieldAccessPredicate(ast.FieldAccess(rcv: ast.Exp, f: ast.Field), perm: ast.Exp)) => {
+      val qSort = symbolConverter.toSort(forall.variables.head.typ)
+
+      val proxyFa = ast.Forall(forall.variables, Seq(), ast.BoolLit(true)())()
+
+      val Seq(tFa, tRcv, tCond, tPerm) = expressionTranslator.translatePrecondition(program, Seq(proxyFa, rcv, cond, perm), this)
+      val inv = Fun( identifierFactory.fresh("inv_" ++ node.getPrettyMetadata._1.toString)
+                   , sorts.Ref +: arguments.tail.map(_.sort)
+                   , qSort)
+      val qi = tFa.asInstanceOf[Quantification].vars.head
+
+      val leftInverse = Forall( qi +: arguments.tail
+                              , Implies(And(tCond, Greater(tPerm, Zero)), App(inv, tRcv +: arguments.tail) === qi)
+                              , Seq(Trigger(App(inv, tRcv +: arguments.tail))))
+      
+      val r = Var(identifierFactory.fresh("r"), sorts.Ref)
+      val tCondr = tCond.replace(qi, App(inv,r +: arguments.tail))
+      val tPermr = tPerm.replace(qi, App(inv,r +: arguments.tail))
+      val tRcvr = tRcv.replace(qi, App(inv,r +: arguments.tail))
+      val rightInverse = Forall( r +: arguments.tail
+                              , Implies(And(tCondr, Greater(tPermr, Zero)), tRcvr === r)
+                              , Seq(Trigger(tRcvr)))
+
+      Map(node.getPrettyMetadata._1 -> (inv, And(leftInverse, rightInverse)))
+    }
+    case _ => Map.empty
+  }
+
+  def mergeFieldDoms(fd1: FieldDomMap , fd2: FieldDomMap) : FieldDomMap = {
+    val fs = fd1.keySet ++ fd2.keySet
+    toMap(fs.map(f => (f, ((x:Var) => Or(
+      fd1.getOrElse(f, (_:Var) => False())(x),
+      fd2.getOrElse(f, (_:Var) => False())(x),
+    )))))
+  }
+
+  def getFieldDoms(pre: ast.Exp) : FieldDomMap = pre match {
+    case ast.And(e1,e2) => mergeFieldDoms(getFieldDoms(e1), getFieldDoms(e2))
+    case ast.FieldAccessPredicate(ast.FieldAccess(rcv: ast.Exp, f: ast.Field), _) => {
+      val tRcv = expressionTranslator.translatePrecondition(program, Seq(rcv), this).head
+      Map(f -> (x => x === tRcv))
+    }
+    case n@QuantifiedPermissionAssertion(forall, cond, ast.FieldAccessPredicate(ast.FieldAccess(rcv: ast.Exp, f: ast.Field), p: ast.Exp)) => {
+      val (inv, invAx) = qpInversesMap(n.getPrettyMetadata._1)
+      val proxyFa = ast.Forall(forall.variables, Seq(), ast.And(cond, ast.GtCmp(p, ast.IntLit(0)())())())()
+      val Seq(tFa) = expressionTranslator.translatePrecondition(program, Seq(proxyFa), this)
+      
+      val i = tFa.asInstanceOf[Quantification].vars.head
+      Map(f -> (r => tFa.asInstanceOf[Quantification].body.replace(i, App(inv, r +: arguments.tail))))
+    }
+    case a => Map.empty
   }
 
   def translatePreconditionToDomain(pre: ast.Exp): Term = pre match {
