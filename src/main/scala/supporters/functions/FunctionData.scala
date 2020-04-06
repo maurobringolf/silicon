@@ -52,7 +52,7 @@ class FunctionData(val programFunction: ast.Function,
   lazy val qpInversesMap : QPinvMap = if (programFunction.pres.isEmpty) Map.empty else getQPInversesMap(programFunction.pres.reduce((p1,p2) => ast.And(p1,p2)()))
 
   def qpInverses : Seq[Fun] = qpInversesMap.map(_._2._1).toSeq
-  def qpInversesAxioms : Seq[Term] = qpInversesMap.map(_._2._2).toSeq
+  def qpInversesAxioms : Seq[Term] = qpInversesMap.flatMap(_._2._2).toSeq
 
   val formalArgs: Map[ast.AbstractLocalVar, Var] = toMap(
     for (arg <- programFunction.formalArgs;
@@ -81,10 +81,11 @@ class FunctionData(val programFunction: ast.Function,
   val triggerAxiom =
     Forall(arguments, triggerFunctionApplication, Trigger(limitedFunctionApplication), s"triggerAxiom [${function.id.name}]")
 
-  // TODO explain, maybe restructure?
-  // qpa -> (inv, anded axioms)
-  type QPinvMap = Map[ast.Position, (Fun, Term)]
-  // TODO explain
+  // Maps a QP assertion (identified by program position) to its inverse receiver function and axioms for it
+  type QPinvMap = Map[ast.Position, (Fun, Seq[Term])]
+  // Maps a field to a Boolean term parametrized by the receiver variable:
+  // If field f maps to function g, then g(x):Bool is a Term describing the condition under
+  // which x:Ref is in the f-domain
   type FieldDomMap = Map[ast.Field, Var => Term]
   
   def restrictHeapAxiom() : Term = {
@@ -135,7 +136,7 @@ class FunctionData(val programFunction: ast.Function,
                               , Seq(Trigger(App(inv,r +: arguments.tail)))
                               , "rightInverse")
 
-      Map(node.getPrettyMetadata._1 -> (inv, And(leftInverse, rightInverse)))
+      Map(node.getPrettyMetadata._1 -> (inv, Seq(leftInverse, rightInverse)))
     }
     case _ => Map.empty
   }
