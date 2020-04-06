@@ -1484,6 +1484,17 @@ object SetIn extends ((Term, Term) => BooleanTerm) {
   def unapply(si: SetIn) = Some((si.p0, si.p1))
 }
 
+class SetEqual(val p0: Term, val p1: Term) extends BooleanTerm
+    with StructuralEqualityBinaryOp[Term]
+
+object SetEqual extends ((Term, Term) => BooleanTerm) {
+  def apply(t0: Term, t1: Term) = {
+    new SetEqual(t0,t1)
+  }
+
+  def unapply(se: SetEqual) = Some((se.p0, se.p1))
+}
+
 class SetCardinality(val p: Term) extends Term
     with StructuralEqualityUnaryOp[Term] {
 

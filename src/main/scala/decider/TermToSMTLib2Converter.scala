@@ -199,6 +199,7 @@ class TermToSMTLib2Converter
     case bop: SetIntersection => renderApp("Set_intersection", Seq(bop.p0, bop.p1), bop.sort)
     case bop: SetUnion => renderApp("Set_union", Seq(bop.p0, bop.p1), bop.sort)
     case bop: SetIn => renderApp("Set_in", Seq(bop.p0, bop.p1), bop.sort)
+    case bop: SetEqual => renderApp("Set_equal", Seq(bop.p0, bop.p1), bop.sort)
     case bop: SetSubset => renderApp("Set_subset", Seq(bop.p0, bop.p1), bop.sort)
     case bop: SetDisjoint => renderApp("Set_disjoint", Seq(bop.p0, bop.p1), bop.sort)
 

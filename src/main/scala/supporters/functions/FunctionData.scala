@@ -14,7 +14,7 @@ import viper.silicon.interfaces.FatalResult
 import viper.silicon.rules.{InverseFunctions, SnapshotMapDefinition, functionSupporter}
 import viper.silicon.state.terms._
 import viper.silicon.state.terms.predef._
-import viper.silicon.state.{IdentifierFactory, SymbolConverter}
+import viper.silicon.state.{Identifier, IdentifierFactory, SymbolConverter}
 import viper.silicon.supporters.PredicateData
 import viper.silicon.{Config, Map, toMap}
 
@@ -49,7 +49,7 @@ class FunctionData(val programFunction: ast.Function,
   val statelessFunction = functionSupporter.statelessVersion(function)
   val restrictHeapFunction = functionSupporter.restrictHeapFunction(function)
 
-  lazy val qpInversesMap : QPinvMap = getQPInversesMap(programFunction.pres.reduce((p1,p2) => ast.And(p1,p2)()))
+  lazy val qpInversesMap : QPinvMap = if (programFunction.pres.isEmpty) Map.empty else getQPInversesMap(programFunction.pres.reduce((p1,p2) => ast.And(p1,p2)()))
 
   def qpInverses : Seq[Fun] = qpInversesMap.map(_._2._1).toSeq
   def qpInversesAxioms : Seq[Term] = qpInversesMap.map(_._2._2).toSeq
@@ -81,27 +81,28 @@ class FunctionData(val programFunction: ast.Function,
   val triggerAxiom =
     Forall(arguments, triggerFunctionApplication, Trigger(limitedFunctionApplication), s"triggerAxiom [${function.id.name}]")
 
-  // TODO explain
+  // TODO explain, maybe restructure?
+  // qpa -> (inv, anded axioms)
   type QPinvMap = Map[ast.Position, (Fun, Term)]
   // TODO explain
   type FieldDomMap = Map[ast.Field, Var => Term]
   
   def restrictHeapAxiom() : Term = {
-    val pre = programFunction.pres.reduce((p1,p2) => ast.And(p1,p2)())
+    val pre = if (programFunction.pres.isEmpty) ast.BoolLit(true)() else programFunction.pres.reduce((p1,p2) => ast.And(p1,p2)())
     val fieldDoms : FieldDomMap = getFieldDoms(pre)
 
     fieldDoms.iterator.map({ case (ast.Field(name, typ), dom) => {
       val x = Var(identifierFactory.fresh("x"), sorts.Ref)
       val fSort = symbolConverter.toSort(typ)
-      Forall( x +: arguments
-            , And( SetIn(x, PHeapFieldDomain(name, restrictHeapApplication)) === dom(x)
-                 , Implies(dom(x), PHeapLookupField(name, fSort, restrictHeapApplication, x) === PHeapLookupField(name, fSort, `?h`, x)))
-            , Seq(Trigger(
-                //SetIn(x, PHeapFieldDomain(name, restrictHeapApplication)))
-                PHeapLookupField(name, symbolConverter.toSort(typ), restrictHeapApplication, x)
-              ))
-            , s"restrictHeapAxiom_dom_${name}[${function.id.name}]"
-      )
+
+      Forall( arguments
+            , Forall( Seq(x)
+                    , And( Iff(SetIn(x, PHeapFieldDomain(name, restrictHeapApplication)), dom(x))
+                         , PHeapLookupField(name, fSort, restrictHeapApplication, x) === PHeapLookupField(name, fSort, `?h`, x))
+                    , Seq( Trigger(PHeapLookupField(name, fSort, restrictHeapApplication, x))
+                         , Trigger(SetIn(x, PHeapFieldDomain(name, restrictHeapApplication)))))
+            , Seq(Trigger(restrictHeapApplication))
+            , s"restrictHeapAxiom_dom_${name}[${function.id.name}]")
     }}).foldLeft[Term](True())((d1,d2) => And(d1,d2))
   }
 
@@ -113,14 +114,17 @@ class FunctionData(val programFunction: ast.Function,
       val proxyFa = ast.Forall(forall.variables, Seq(), ast.BoolLit(true)())()
 
       val Seq(tFa, tRcv, tCond, tPerm) = expressionTranslator.translatePrecondition(program, Seq(proxyFa, rcv, cond, perm), this)
-      val inv = Fun( identifierFactory.fresh("inv_" ++ node.getPrettyMetadata._1.toString)
-                   , sorts.Ref +: arguments.tail.map(_.sort)
-                   , qSort)
       val qi = tFa.asInstanceOf[Quantification].vars.head
 
+      // TODO: Use better naming, probably just line number
+      val inv = Fun( Identifier("inv_" ++ node.getPrettyMetadata._1.toString)
+                   , sorts.Ref +: arguments.tail.map(_.sort)
+                   , qSort)
+
       val leftInverse = Forall( qi +: arguments.tail
-                              , Implies(And(tCond, Greater(tPerm, Zero)), App(inv, tRcv +: arguments.tail) === qi)
-                              , Seq(Trigger(App(inv, tRcv +: arguments.tail))))
+                              , Implies(And(tCond, Greater(tPerm, Zero)), (App(inv, tRcv +: arguments.tail) === qi))
+                              , Seq(Trigger(App(inv, tRcv +: arguments.tail)))
+                              , "leftInverse")
       
       val r = Var(identifierFactory.fresh("r"), sorts.Ref)
       val tCondr = tCond.replace(qi, App(inv,r +: arguments.tail))
@@ -128,7 +132,8 @@ class FunctionData(val programFunction: ast.Function,
       val tRcvr = tRcv.replace(qi, App(inv,r +: arguments.tail))
       val rightInverse = Forall( r +: arguments.tail
                               , Implies(And(tCondr, Greater(tPermr, Zero)), tRcvr === r)
-                              , Seq(Trigger(tRcvr)))
+                              , Seq(Trigger(App(inv,r +: arguments.tail)))
+                              , "rightInverse")
 
       Map(node.getPrettyMetadata._1 -> (inv, And(leftInverse, rightInverse)))
     }

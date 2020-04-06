@@ -21,16 +21,24 @@
 (declare-fun PHeap.toFVF_$FLD$ (PHeap) $FVF<$S$>)
 
 (assert (forall ((fvf $FVF<$S$>) (x $Ref)) (!
-    (=
-        ($FVF.lookup_$FLD$ fvf x)
-        (PHeap.lookup_$FLD$ ($FVF.toPHeap_$FLD$ fvf) x)
+    (implies
+        (Set_in x ($FVF.domain_$FLD$ fvf))
+        (=
+            ($FVF.lookup_$FLD$ fvf x)
+            (PHeap.lookup_$FLD$ ($FVF.toPHeap_$FLD$ fvf) x)
+        )
     )
-    :pattern ((PHeap.lookup_$FLD$ ($FVF.toPHeap_$FLD$ fvf) x)))))
+    :pattern ((Set_in x (PHeap.dom_$FLD$ ($FVF.toPHeap_$FLD$ fvf))))
+    :pattern ((PHeap.lookup_$FLD$ ($FVF.toPHeap_$FLD$ fvf) x))
+    :pattern ((Set_in x ($FVF.domain_$FLD$ fvf)) 
+    ))))
 
 (assert (forall ((fvf $FVF<$S$>) (x $Ref)) (!
     (=
         (Set_in x ($FVF.domain_$FLD$ fvf))
         (Set_in x (PHeap.dom_$FLD$ ($FVF.toPHeap_$FLD$ fvf)))
     )
-    :pattern ((Set_in x (PHeap.dom_$FLD$ ($FVF.toPHeap_$FLD$ fvf)))))))
+    :pattern ((Set_in x (PHeap.dom_$FLD$ ($FVF.toPHeap_$FLD$ fvf))))
+    :pattern ((Set_in x ($FVF.domain_$FLD$ fvf)))
+    )))
 

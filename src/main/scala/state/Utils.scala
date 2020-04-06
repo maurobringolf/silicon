@@ -254,6 +254,14 @@ package object utils {
       case PredicatePermLookup(predname, pm, args) => PredicatePermLookup(predname, go(pm), args map go)
       case PredicateTrigger(p, psf, args) => PredicateTrigger(p, go(psf), args map go)
 
+      case PHeapCombine(h1, h2) => PHeapCombine( go(h1), go(h2))
+      case PHeapLookupField(f, s, h, at) => PHeapLookupField(f, s, go(h), go(at))
+      case PHeapLookupPredicate(p, h, args) => PHeapLookupPredicate(p, go(h), args map go)
+      case PHeapRemovePredicate(p, h, args) => PHeapRemovePredicate(p, go(h), args map go)
+      case PHeapSingletonField(f, x, v) => PHeapSingletonField(f, go(x), go(v))
+      case PHeapSingletonPredicate(p, args, h) => PHeapSingletonPredicate(p, args map go, go(h))
+      case PHeapRestrict(g, h, args) => PHeapRestrict(g, go(h), args map go)
+
       case PHeapToFVF(f, fs, h) => PHeapToFVF(f,fs,go(h))
       case FVFToPHeap(f, fvf) => FVFToPHeap(f, go(fvf))
     }
