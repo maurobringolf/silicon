@@ -231,6 +231,10 @@ class TermToSMTLib2Converter
     case PHeapSingletonPredicate(p, args, h) => parens(text("PHeap.singleton_") <> p <+> args.map(a => convert(a)).mkString(" ") <+> render(h))
     case PHeapRestrict(f, h, args) => parens(text("PHeap.restrict_") <> f <+> convert(h) <+> args.map(a => convert(a)).mkString(" "))
 
+    case PHeapPredicateLoc(p, args) => parens(text("PHeap.loc_") <> p <+> args.map(convert).mkString(" "))
+
+    case PHeapPredicateDomain(p, h) => parens(text("PHeap.dom_") <> p <+> convert(h))
+
     /* Quantified Permissions */
 
     case Domain(id, fvf) => parens(text("$FVF.domain_") <> id <+> render(fvf))

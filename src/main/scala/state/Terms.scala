@@ -1735,6 +1735,16 @@ object PHeapFieldDomain extends ((String, Term) => Term) {
   def unapply(lk: PHeapFieldDomain) = Some((lk.field, lk.h))
 }
 
+class PHeapPredicateLoc(val predicate: String, val args: Seq[Term]) extends Term {
+  val sort = sorts.Loc
+}
+
+object PHeapPredicateLoc extends ((String, Seq[Term]) => Term) {
+  def apply(predicate: String, args: Seq[Term]) = new PHeapPredicateLoc(predicate, args)
+
+  def unapply(pl: PHeapPredicateLoc) = Some((pl.predicate, pl.args))
+}
+
 class PHeapLookupPredicate(val predicate: String, val h: Term, val args: Seq[Term]) extends PHeapTerm
 
 object PHeapLookupPredicate extends ((String, Term, Seq[Term]) => Term) {
@@ -1744,6 +1754,10 @@ object PHeapLookupPredicate extends ((String, Term, Seq[Term]) => Term) {
   }
 
   def unapply(lk: PHeapLookupPredicate) = Some((lk.predicate, lk.h, lk.args))
+}
+
+case class PHeapPredicateDomain(predicate: String, h: Term) extends Term {
+  val sort = sorts.Set(sorts.Loc)
 }
 
 case class PHeapRemovePredicate(predicate: String, h: Term, args: Seq[Term]) extends PHeapTerm
