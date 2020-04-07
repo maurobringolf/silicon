@@ -532,7 +532,7 @@ object quantifiedChunkSupporter extends QuantifiedChunkSupport with Immutable {
                              codomainQVars: Seq[Var],
                              relevantChunks: Seq[QuantifiedBasicChunk],
                              v: Verifier,
-                             optSmDomainDefinitionCondition: Option[Term] = None,
+                             optSmDomainDefinitionCondition: Option[Term] = Some(True()),
                              optQVarsInstantiations: Option[Seq[Term]] = None)
                             : (SnapshotMapDefinition, SnapshotMapCache) = {
 
@@ -685,6 +685,7 @@ object quantifiedChunkSupporter extends QuantifiedChunkSupport with Immutable {
     val ax = inverseFunctions.axiomInversesOfInvertibles
     val inv = inverseFunctions.copy(axiomInversesOfInvertibles = Forall(ax.vars, ax.body, effectiveTriggers))
 
+
     v.decider.prover.comment("Definitional axioms for inverse functions")
     val definitionalAxiomMark = v.decider.setPathConditionMark()
     v.decider.assume(inv.definitionalAxioms)
@@ -726,6 +727,8 @@ object quantifiedChunkSupporter extends QuantifiedChunkSupport with Immutable {
     val qvarsToInv = inv.qvarsToInversesOf(codomainVars)
     val condOfInv = tCond.replace(qvarsToInv)
     v.decider.assume(Forall(codomainVars, Implies(condOfInv, trigger), Trigger(inv.inversesOf(codomainVars)))) //effectiveTriggers map (t => Trigger(t.p map (_.replace(qvarsToInv))))))
+
+    v.decider.assume(tSnap === smDef1.sm)
     val s1 =
       s.copy(h = h1,
              functionRecorder = s.functionRecorder.recordFieldInv(inv),
