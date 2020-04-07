@@ -96,7 +96,6 @@ class FunctionData(val programFunction: ast.Function,
     val predDoms : DomMap[ast.Predicate] = getPredDoms(pre)
 
     val d1 = predDoms.iterator.map({ case (p, dom) => {
-      // TODO: Create fresh pArgs based on p's type
       val pArgs = p.formalArgs.map(x => Var(identifierFactory.fresh(x.name), symbolConverter.toSort(x.typ)))
       val x = Var(identifierFactory.fresh("loc"), sorts.Loc)
 
