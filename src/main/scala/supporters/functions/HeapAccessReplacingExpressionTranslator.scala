@@ -155,6 +155,15 @@ class HeapAccessReplacingExpressionTranslator(symbolConverter: SymbolConverter,
         else
           fapp.copy(applicable = functionSupporter.limitedVersion(fun))
 
+      case n:ast.WildcardPerm =>
+        // TODO: Not perfect injection, could additionally use n.pos.asInstanceOf[ast.HasLineColumn].column
+        // TODO: Handle wildcards without source position
+
+        val w = IntLiteral(n.pos.asInstanceOf[ast.HasLineColumn].line)
+        // TODO make a meta term
+        App(Fun(Identifier("freshWildcard"), Seq(sorts.Int), sorts.Perm), Seq(w))
+        //super.translate(symbolConverter.toSort)(e)
+
       case _ => super.translate(symbolConverter.toSort)(e)
     }
 
