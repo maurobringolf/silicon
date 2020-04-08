@@ -87,7 +87,7 @@ class FunctionData(val programFunction: ast.Function,
   // Maps a resource to a Boolean term parametrized by the receiver
   // e.g. If field f maps to function g, then g(x):Bool is a Term describing the condition under
   // which x:Ref is in the f-domain.
-  type DomMap[K] = Map[K, Var => Term]
+  type DomMap[K] = Map[K, Term => Term]
   
   def restrictHeapAxiom() : Term = {
     val pre = if (programFunction.pres.isEmpty) ast.BoolLit(true)() else programFunction.pres.reduce((p1,p2) => ast.And(p1,p2)())
@@ -102,8 +102,8 @@ class FunctionData(val programFunction: ast.Function,
       Forall( arguments
             , Forall( pArgs
                     , Let(x, PHeapPredicateLoc(p.name, pArgs),
-                        And( Iff(SetIn(x, PHeapPredicateDomain(p.name, restrictHeapApplication)), dom(x))
-                           , PHeapLookupPredicate(p.name, restrictHeapApplication, pArgs) === PHeapLookupPredicate(p.name, `?h`, pArgs)))
+                        And( Iff(SetIn(x, PHeapPredicateDomain(p.name, restrictHeapApplication)), dom(   PHeapPredicateLoc(p.name, pArgs)  ))
+                           , Implies(SetIn(x, PHeapPredicateDomain(p.name, restrictHeapApplication)), PHeapLookupPredicate(p.name, restrictHeapApplication, pArgs) === PHeapLookupPredicate(p.name, `?h`, pArgs))))
                     , Seq( Trigger(SetIn(PHeapPredicateLoc(p.name, pArgs), PHeapPredicateDomain(p.name, restrictHeapApplication)))
                          , Trigger(PHeapLookupPredicate(p.name, restrictHeapApplication, pArgs)))
                     )
@@ -164,9 +164,9 @@ class FunctionData(val programFunction: ast.Function,
 
   def mergeDoms[K](fd1: DomMap[K] , fd2: DomMap[K]) : DomMap[K] = {
     val fs = fd1.keySet ++ fd2.keySet
-    toMap(fs.map(k => (k, ((x:Var) => Or(
-      fd1.getOrElse(k, (_:Var) => False())(x),
-      fd2.getOrElse(k, (_:Var) => False())(x),
+    toMap(fs.map(k => (k, ((x:Term) => Or(
+      fd1.getOrElse(k, (_:Term) => False())(x),
+      fd2.getOrElse(k, (_:Term) => False())(x),
     )))))
   }
 
@@ -184,14 +184,20 @@ class FunctionData(val programFunction: ast.Function,
       val i = tFa.asInstanceOf[Quantification].vars.head
       Map(f -> (r => tFa.asInstanceOf[Quantification].body.replace(i, App(inv, r +: arguments.tail))))
     }
-    case a => Map.empty
+    case a => toMap(program.fields.zip(Seq.fill(program.fields.length){(_:Term) => False()}))
   }
 
   def getPredDoms(pre: ast.Exp): DomMap[ast.Predicate] = pre match {
     case ast.And(e1, e2) => mergeDoms(getPredDoms(e1), getPredDoms(e2))
     case ast.PredicateAccessPredicate(ast.PredicateAccess(args, p), _) => {
       val tArgs = expressionTranslator.translatePrecondition(program, args, this)
-      Map(program.findPredicate(p) -> (x => x === PHeapPredicateLoc(p, tArgs)))
+
+      Map(program.findPredicate(p) -> (x => {
+        // TODO: Stop hacking
+        val pArgs = x.asInstanceOf[PHeapPredicateLoc].args
+        And( pArgs.zip(tArgs).map({ case (a,b) => a === b }))
+        //x === PHeapPredicateLoc(p, tArgs)
+      }))
     }
     case a => Map.empty
   }
