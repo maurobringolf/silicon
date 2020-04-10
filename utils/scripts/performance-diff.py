@@ -70,7 +70,10 @@ def makePlot(config):
                 z2 += [ meanRatio * (1 - float(base[4])/200) ]
 
 
-            plt.xticks(range(len(names)), labels=list(map(lambda x: x + 1, range(len(names)))))
+            #plt.xticks(range(len(names)), labels=list(map(lambda x: x + 1, range(len(names)))))
+
+            ticks = np.arange(-1, len(names), 10)
+            plt.xticks(ticks, labels=ticks+1)
 
             plt.plot(range(len(names)), z1, marker='_', color='black', linestyle='None', label="stdDev cmp")
             plt.plot(range(len(names)), z2, marker='_', color='black', linestyle='None')
@@ -86,7 +89,9 @@ def makePlot(config):
 
             plt.legend()
             plt.title("Mean")
-            plt.savefig(f"{config.TMPDIR}/performance-diff.png")
+
+
+            plt.savefig(f"{config.TMPDIR}/performance-diff.png", dpi=500)
 
 
 if __name__ == "__main__":
