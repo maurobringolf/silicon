@@ -41,34 +41,50 @@ def makePlot(config):
 
             # Filter out all tests with unequal verification results
             relevantTests = filter(lambda x: shouldIncludeTest(x[0][8], x[1][8]), zip(baseR, compareR))
+            testIndex = open(f"{config.TMPDIR}/testcase-index.txt", 'w+')
 
             names = []
-            meanSlowdown = []
-            bestSlowdown = []
-            worstSlowdown = []
-            relStdDevDiff = []
             absoluteBaseMean = []
+            meanRatios = []
+
+            y1 = []
+            y2 = []
+            z1 = []
+            z2 = []
 
             for t in relevantTests:
                 base = t[0]
                 cmp = t[1]
                 names += [base[0]]
-                absoluteBaseMean += [int(base[2])]
-                meanSlowdown += [round(int(cmp[2])/ int(base[2]), 1)]
-                bestSlowdown += [round(int(cmp[5])/ int(base[5]), 1)]
-                worstSlowdown += [round(int(cmp[7])/int(base[7]), 1)]
-                relStdDevDiff += [ 1 + (int(cmp[4]) - int(base[4]))/100 ]
 
-            plt.xticks( range(len(names))
-                      #, labels=names
-                      , rotation=90)
-            #plt.subplots_adjust(bottom=0.5)
+                testIndex.write(base[0] + "\n")
 
-            plt.scatter(range(len(names)), bestSlowdown, c=absoluteBaseMean, cmap='gray_r')
-            plt.scatter(range(len(names)), meanSlowdown, c=absoluteBaseMean, cmap='gray_r')
+                absoluteBaseMean += [int(base[2]) / 1000]
+
+                meanRatio = float(cmp[2])/float(base[2])
+                meanRatios += [meanRatio]
+
+                y1 += [ meanRatio * (1 + float(cmp[4])/200) ]
+                y2 += [ meanRatio * (1 - float(cmp[4])/200) ]
+                z1 += [ meanRatio * (1 + float(base[4])/200) ]
+                z2 += [ meanRatio * (1 - float(base[4])/200) ]
+
+
+            plt.xticks(range(len(names)), labels=list(map(lambda x: x + 1, range(len(names)))))
+
+            plt.plot(range(len(names)), z1, marker='_', color='black', linestyle='None', label="stdDev cmp")
+            plt.plot(range(len(names)), z2, marker='_', color='black', linestyle='None')
+
+            plt.plot(range(len(names)), y1, marker='_', color='red', linestyle='None', label="stdDev base (scaled to cmp mean)")
+            plt.plot(range(len(names)), y2, marker='_', color='red', linestyle='None')
+
+            plt.margins(0.3,0.3)
+
+            plt.scatter(range(len(names)), meanRatios, c=absoluteBaseMean, cmap='jet')
             plt.colorbar()
             plt.grid(color='0.9', linestyle='-', axis='x', linewidth=0.5)
 
+            plt.legend()
             plt.title("Mean")
             plt.savefig(f"{config.TMPDIR}/performance-diff.png")
 
