@@ -14,8 +14,8 @@ parser.add_argument('--cmp', metavar='cmp', type=str, nargs=1,default='master', 
                    help='Compared version')
 parser.add_argument('--testClass', metavar='testClass', type=str, nargs=1,default='FrontendGeneratedTests', dest='TESTCLASS',
                    help='Name of the Scala test class to be run')
-parser.add_argument('-p', dest='PLOTONLY',action='store_true',
-                   help='Only plot the data that is stored in the presumably already existing CSV files.')
+parser.add_argument('--run', dest='RUN',action='store_true',
+                   help='Actually do the test run. Default behavior only creates the plot from presumably existing CSV files.')
 
 
 def shouldIncludeTest(baseResults, compareResults):
@@ -47,29 +47,31 @@ def makePlot(config):
             bestSlowdown = []
             worstSlowdown = []
             relStdDevDiff = []
+            absoluteBaseMean = []
 
             for t in relevantTests:
                 base = t[0]
                 cmp = t[1]
                 names += [base[0]]
-                meanSlowdown += [round(100 * (int(cmp[2]) - int(base[2])) / int(cmp[2]), 1)]
-                bestSlowdown += [round(100 * (int(cmp[5]) - int(base[5])) / int(cmp[5]), 1)]
-                worstSlowdown += [round(100 * (int(cmp[7]) - int(base[7])) / int(cmp[7]), 1)]
-                relStdDevDiff += [int(cmp[4]) - int(base[4])]
+                absoluteBaseMean += [int(base[2])]
+                meanSlowdown += [round(int(cmp[2])/ int(base[2]), 1)]
+                bestSlowdown += [round(int(cmp[5])/ int(base[5]), 1)]
+                worstSlowdown += [round(int(cmp[7])/int(base[7]), 1)]
+                relStdDevDiff += [ 1 + (int(cmp[4]) - int(base[4]))/100 ]
 
-            axes = plt.gca()
             plt.xticks( range(len(names))
-                      #, names
+                      #, labels=names
                       , rotation=90)
+            #plt.subplots_adjust(bottom=0.5)
 
-            matplotlib.pyplot.table(names)
+            plt.scatter(range(len(names)), bestSlowdown, c=absoluteBaseMean, cmap='gray_r')
+            plt.scatter(range(len(names)), meanSlowdown, c=absoluteBaseMean, cmap='gray_r')
+            plt.colorbar()
+            plt.grid(color='0.9', linestyle='-', axis='x', linewidth=0.5)
 
-            plt.plot(range(len(names)), meanSlowdown, "ko--", label="relative slowdown (mean) [%]")
-            plt.plot(range(len(names)), bestSlowdown, "go", label="relative slowdown (best) [%]")
-            plt.plot(range(len(names)), worstSlowdown, "ro", label="relative slowdown (worst) [%]")
-
-            plt.legend()
+            plt.title("Mean")
             plt.savefig(f"{config.TMPDIR}/performance-diff.png")
+
 
 if __name__ == "__main__":
 
@@ -81,13 +83,11 @@ if __name__ == "__main__":
     config.CMPCSV = config.CMP.replace("/", "_") + ".csv"
     config.TMPDIR = 'tmp_csv'
 
-    if not config.PLOTONLY:
-        #checkoutAndRun(config)
-        pass
+    if config.RUN:
+        status = subprocess.run(f'git status --porcelain', shell=True,capture_output=True,text=True)
+        if(status.stdout.strip() != ""):
+            exit("ABORTED: It seems that you have are not in a clean git state. Commit everything first.")
+        checkoutAndRun(config)
 
-    x = subprocess.run(f'git status --porcelain', shell=True,capture_output=True,text=True)
-
-    if(x.stdout.strip() != ""):
-        exit("ABORTED: It seems that you have are not in a clean git state. Commit everything first.")
 
     makePlot(config)
