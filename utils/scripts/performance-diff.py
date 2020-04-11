@@ -39,8 +39,14 @@ def makePlot(config):
             next(baseR)
             next(compareR)
 
+
             # Filter out all tests with unequal verification results
-            relevantTests = filter(lambda x: shouldIncludeTest(x[0][8], x[1][8]), zip(baseR, compareR))
+            relevantTests = filter(
+                lambda x: shouldIncludeTest(x[0][8], x[1][8]),
+                filter(
+                    # Not a complete test row (can happen on failed Silver parsing)
+                    lambda x: len(x[0]) >= 9 or len(x[1]) >= 9, zip(baseR, compareR)))
+
             testIndex = open(f"{config.TMPDIR}/testcase-index.txt", 'w+')
 
             names = []
@@ -72,7 +78,7 @@ def makePlot(config):
 
             #plt.xticks(range(len(names)), labels=list(map(lambda x: x + 1, range(len(names)))))
 
-            ticks = np.arange(-1, len(names), 10)
+            ticks = np.arange(-1, len(names), 5)
             plt.xticks(ticks, labels=ticks+1)
 
             plt.plot(range(len(names)), z1, marker='_', color='black', linestyle='None', label="stdDev cmp")
@@ -84,11 +90,12 @@ def makePlot(config):
             plt.margins(0.3,0.3)
 
             plt.scatter(range(len(names)), meanRatios, c=absoluteBaseMean, cmap='jet')
-            plt.colorbar()
+            plt.colorbar(label='Mean base runtime [s]')
             plt.grid(color='0.9', linestyle='-', axis='x', linewidth=0.5)
+            plt.axhline(y=1, color='0.9', linestyle='-', linewidth=0.5)
 
             plt.legend()
-            plt.title("Mean")
+            plt.title("Performance distribution")
 
 
             plt.savefig(f"{config.TMPDIR}/performance-diff.png", dpi=500)
