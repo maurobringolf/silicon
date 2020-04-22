@@ -178,11 +178,23 @@ class DefaultPHeapsContributor(preambleReader: PreambleReader[String, String],
                           ): Iterable[Term] = {
     val h1 = Var(Identifier("h1"), sorts.PHeap)
     val h2 = Var(Identifier("h2"), sorts.PHeap)
+    val h3 = Var(Identifier("h3"), sorts.PHeap)
     val r = Var(Identifier("r"), sorts.Ref)
     val pHeap_equal = Fun(Identifier("PHeap.equal"), Seq(sorts.PHeap, sorts.PHeap), sorts.Bool)
 
     // TODO
-    val equalOnPredicates = True()
+    def equalOnPred(p: ast.Predicate) : Term = {
+      val l = Var(Identifier("l"), sorts.Loc)
+      val lk1 = App(Fun(Identifier("PHeap.lookup_" ++ p.name), Seq(sorts.PHeap, sorts.Loc), sorts.PHeap), Seq(h1, l))
+      val lk2 = App(Fun(Identifier("PHeap.lookup_" ++ p.name), Seq(sorts.PHeap, sorts.Loc), sorts.PHeap), Seq(h2, l))
+      And( SetEqual(PHeapPredicateDomain(p.name, h1), PHeapPredicateDomain(p.name, h2))
+         , Forall( Seq(l)
+                 , Implies( SetIn(l, PHeapPredicateDomain(p.name, h1))
+                          , App(pHeap_equal, Seq(lk1, lk2)))
+                 , Seq(Trigger(Seq(lk1, lk2)))
+         )
+      )
+    }
 
     def equalOnField(f: ast.Field) : Term = {
       val fSort = symbolConverter.toSort(f.typ)
@@ -195,20 +207,72 @@ class DefaultPHeapsContributor(preambleReader: PreambleReader[String, String],
       )
     }
 
+    val equalOnPredicates = predicates.foldLeft[Term](True())((ax, p) => And(ax, equalOnPred(p)))
     val equalOnFields = fields.foldLeft[Term](True())((ax, f) => And(ax, equalOnField(f)))
-    
-    functions.map(g => {
+
+    // TODO: Add scala level PHeapEqual term
+    val pheapEqual = App(Fun(Identifier("PHeap.equal"), Seq(sorts.PHeap, sorts.PHeap), sorts.Bool), Seq(h1,h2))
+   
+    val frameFunctions = functions.map(g => {
       // TODO: This contains a lot of duplication with the function supporter and relies on its internals.
       // Somehow make it reuse that code.
       val argSorts = g.formalArgs.map(x => symbolConverter.toSort(x.typ))
       val resultSort = symbolConverter.toSort(g.typ)
       val args = g.formalArgs.map(x => Var(Identifier(x.name), symbolConverter.toSort(x.typ)))
       val eqAx = Forall( Seq(h1, h2) ++ args
-                      , Implies(And(equalOnFields, equalOnPredicates), (App(HeapDepFun(Identifier(g.name ++ "%limited"), sorts.PHeap +: argSorts, resultSort), h1 +: args) === App(HeapDepFun(Identifier(g.name ++ "%limited"), sorts.PHeap +: argSorts, resultSort), h2 +: args)))
+                      , Implies(pheapEqual, (App(HeapDepFun(Identifier(g.name ++ "%limited"), sorts.PHeap +: argSorts, resultSort), h1 +: args) === App(HeapDepFun(Identifier(g.name ++ "%limited"), sorts.PHeap +: argSorts, resultSort), h2 +: args)))
                       , Seq(Trigger(Seq( App(HeapDepFun(Identifier(g.name ++ "%limited"), sorts.PHeap +: argSorts, resultSort), h1 +: args)
                                        , App(HeapDepFun(Identifier(g.name ++ "%limited"), sorts.PHeap +: argSorts, resultSort), h2 +: args)))))
       eqAx
     })
+
+    val predTriggers = predicates.map(p => {
+
+      val argSorts = p.formalArgs.map(x => symbolConverter.toSort(x.typ))
+      val args = p.formalArgs.map(x => Var(Identifier(x.name), symbolConverter.toSort(x.typ)))
+
+      val eqAx = Forall( Seq(h1, h2) ++ args
+                      , Implies(pheapEqual, App(Fun(Identifier(p.name ++ "%trigger"), Seq(sorts.PHeap) ++ argSorts, sorts.Bool), h1 +: args) === App(Fun(Identifier(p.name ++ "%trigger"), sorts.PHeap +: argSorts, sorts.Bool), h2 +: args))
+                      , Seq(Trigger(Seq(
+                    App(Fun(Identifier(p.name ++ "%trigger"), Seq(sorts.PHeap) ++ argSorts, sorts.Bool), h1 +: args) 
+                    ,App(Fun(Identifier(p.name ++ "%trigger"), Seq(sorts.PHeap) ++ argSorts, sorts.Bool), h2 +: args) 
+
+                      )),
+                      Trigger(Seq(
+
+                    App(Fun(Identifier(p.name ++ "%trigger"), Seq(sorts.PHeap) ++ argSorts, sorts.Bool), h1 +: args) 
+                    , pheapEqual
+                      ))
+                      ))
+      eqAx
+    })
+
+    val eqSym = Forall( Seq(h1, h2)
+                      , pheapEqual === App(Fun(Identifier("PHeap.equal"), Seq(sorts.PHeap, sorts.PHeap), sorts.Bool), Seq(h2,h1))
+                      , Seq(Trigger(pheapEqual))
+                      )
+
+    val eqTrans = Forall( Seq(h1, h2, h3)
+                        , Implies(And(
+                          pheapEqual
+                          , App(Fun(Identifier("PHeap.equal"), Seq(sorts.PHeap, sorts.PHeap), sorts.Bool), Seq(h2,h3))
+                        ), App(Fun(Identifier("PHeap.equal"), Seq(sorts.PHeap, sorts.PHeap), sorts.Bool), Seq(h1,h3))
+
+                        )
+                        , Seq(Trigger(Seq(pheapEqual, App(Fun(Identifier("PHeap.equal"), Seq(sorts.PHeap, sorts.PHeap), sorts.Bool), Seq(h2,h3))  )))
+                        )
+
+    val extEq = Forall( Seq(h1, h2)
+                      , Iff(And(equalOnFields, equalOnPredicates), pheapEqual)
+                      , Seq(Trigger(pheapEqual))
+                      )
+
+    val eqLift = Forall( Seq(h1, h2)
+                       , Implies(h1 === h2, pheapEqual)
+                       , Seq(Trigger(pheapEqual))
+                       )
+
+    (/*eqSym +:*/ eqLift +: extEq +: frameFunctions) //++ predTriggers
   }
 
   def predicateSingletonFieldDomains(predicates: Seq[ast.Predicate], fields: Seq[ast.Field]): Iterable[PreambleBlock] = {

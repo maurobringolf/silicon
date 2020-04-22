@@ -152,8 +152,15 @@ class HeapAccessReplacingExpressionTranslator(symbolConverter: SymbolConverter,
 
         if (callerHeight < calleeHeight)
           fapp
-        else
-          fapp.copy(applicable = functionSupporter.limitedVersion(fun))
+        else {
+          val untaggedSnap = PHeapRestrict(fun.id.name, this.snap, args)
+          val callerData = functionData(eFApp.func(program))
+          val taggedSnap = callerData.predicateTriggers.keys.foldLeft[Term](untaggedSnap)((h, p) => {
+            val tag = Fun(Identifier("PHeap.funTrigger_" ++ p.name), Seq(sorts.PHeap), sorts.PHeap)
+            App(tag, Seq(h))
+          })
+         App(functionSupporter.limitedVersion(fun), taggedSnap +: args)
+        }
 
       case n:ast.WildcardPerm =>
         // TODO: Not perfect injection, could additionally use n.pos.asInstanceOf[ast.HasLineColumn].column

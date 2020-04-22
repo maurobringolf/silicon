@@ -103,7 +103,10 @@ class FunctionData(val programFunction: ast.Function,
             , Forall( pArgs
                     , Let(x, PHeapPredicateLoc(p.name, pArgs),
                         And( Iff(SetIn(x, PHeapPredicateDomain(p.name, restrictHeapApplication)), dom(   PHeapPredicateLoc(p.name, pArgs)  ))
-                           , Implies(SetIn(x, PHeapPredicateDomain(p.name, restrictHeapApplication)), PHeapLookupPredicate(p.name, restrictHeapApplication, pArgs) === PHeapLookupPredicate(p.name, `?h`, pArgs))))
+                           , Implies(SetIn(x, PHeapPredicateDomain(p.name, restrictHeapApplication)),
+                             PHeapLookupPredicate(p.name, restrictHeapApplication, pArgs) === PHeapLookupPredicate(p.name, `?h`, pArgs)
+                             //App(Fun(Identifier("PHeap.equal"), Seq(sorts.PHeap, sorts.PHeap), sorts.Bool), Seq(PHeapLookupPredicate(p.name, restrictHeapApplication, pArgs) , PHeapLookupPredicate(p.name, `?h`, pArgs)))
+                             )))
                     , Seq( Trigger(SetIn(PHeapPredicateLoc(p.name, pArgs), PHeapPredicateDomain(p.name, restrictHeapApplication)))
                          , Trigger(PHeapLookupPredicate(p.name, restrictHeapApplication, pArgs)))
                     )
@@ -118,7 +121,7 @@ class FunctionData(val programFunction: ast.Function,
       Forall( arguments
             , Forall( Seq(x)
                     , And( Iff(SetIn(x, PHeapFieldDomain(name, restrictHeapApplication)), dom(x))
-                         , PHeapLookupField(name, fSort, restrictHeapApplication, x) === PHeapLookupField(name, fSort, `?h`, x))
+                         , Implies(SetIn(x, PHeapFieldDomain(name, restrictHeapApplication)), PHeapLookupField(name, fSort, restrictHeapApplication, x) === PHeapLookupField(name, fSort, `?h`, x)))
                     , Seq( Trigger(PHeapLookupField(name, fSort, restrictHeapApplication, x))
                          , Trigger(SetIn(x, PHeapFieldDomain(name, restrictHeapApplication)))))
             , Seq(Trigger(restrictHeapApplication))
@@ -162,9 +165,9 @@ class FunctionData(val programFunction: ast.Function,
     case _ => Map.empty
   }
 
-  def mergeDoms[K](fd1: DomMap[K] , fd2: DomMap[K]) : DomMap[K] = {
+  def mergeDoms[K](fd1: DomMap[K] , fd2: DomMap[K], merger: (Term,Term) => Term = ((d1,d2) => Or(d1,d2))) : DomMap[K] = {
     val fs = fd1.keySet ++ fd2.keySet
-    toMap(fs.map(k => (k, ((x:Term) => Or(
+    toMap(fs.map(k => (k, ((x:Term) => merger(
       fd1.getOrElse(k, (_:Term) => False())(x),
       fd2.getOrElse(k, (_:Term) => False())(x),
     )))))
@@ -184,7 +187,25 @@ class FunctionData(val programFunction: ast.Function,
       val i = tFa.asInstanceOf[Quantification].vars.head
       Map(f -> (r => tFa.asInstanceOf[Quantification].body.replace(i, App(inv, r +: arguments.tail))))
     }
-    case a => toMap(program.fields.zip(Seq.fill(program.fields.length){(_:Term) => False()}))
+    case ast.FieldAccessPredicate(_,_) => Map.empty
+    case n@ast.CondExp(cond,e1,e2) =>
+      val tCond = expressionTranslator.translatePrecondition(program, Seq(cond), this).head
+      val e1Dom = getFieldDoms(e1)
+      val e2Dom = getFieldDoms(e2)
+      mergeDoms(e1Dom, e2Dom, (d1, d2) => Ite(tCond, d1, d2))
+    case ast.PredicateAccessPredicate(ast.PredicateAccess(args, p), _) =>
+      // TODO: Unify this case with below
+      toMap(program.fields.zip(Seq.fill(program.fields.length){(_:Term) => False()}))
+    case ast.Implies(cond, e2) =>
+      // TODO: Unify this case with CondExp
+      val tCond = expressionTranslator.translatePrecondition(program, Seq(cond), this).head
+      val e2Dom = getFieldDoms(e2)
+      mergeDoms(e2Dom,
+        toMap(program.fields.zip(Seq.fill(program.fields.length){(_:Term) => False()}))
+        , (d1,d2) => Ite(tCond, d1, d2))
+    case a =>
+      if (a.isPure) toMap(program.fields.zip(Seq.fill(program.fields.length){(_:Term) => False()}))
+        else sys.error("Cannot translate field domain of " ++ a.toString)
   }
 
   def getPredDoms(pre: ast.Exp): DomMap[ast.Predicate] = pre match {
@@ -199,7 +220,24 @@ class FunctionData(val programFunction: ast.Function,
         //x === PHeapPredicateLoc(p, tArgs)
       }))
     }
-    case a => Map.empty
+    case ast.FieldAccessPredicate(_,_) => toMap(program.predicates.zip(Seq.fill(program.predicates.length){(_:Term) => False()}))
+
+    // TODO
+    case n@ast.CondExp(cond,e1,e2) => 
+      val tCond = expressionTranslator.translatePrecondition(program, Seq(cond), this).head
+      val e1Dom = getPredDoms(e1)
+      val e2Dom = getPredDoms(e2)
+      mergeDoms(e1Dom, e2Dom, (d1, d2) => Ite(tCond, d1, d2))
+    case ast.Implies(cond, e2) =>
+      // TODO: Unify this case with CondExp
+      val tCond = expressionTranslator.translatePrecondition(program, Seq(cond), this).head
+      val e2Dom = getPredDoms(e2)
+      mergeDoms(e2Dom,
+        toMap(program.predicates.zip(Seq.fill(program.predicates.length){(_:Term) => False()}))
+        , (d1,d2) => Ite(tCond, d1, d2))
+    case a => 
+      if (a.isPure) toMap(program.predicates.zip(Seq.fill(program.predicates.length){(_:Term) => False()}))
+        else sys.error("Cannot translate predicate domain of " ++ a.toString)
   }
 
   /*
