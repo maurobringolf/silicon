@@ -88,44 +88,85 @@ class FunctionData(val programFunction: ast.Function,
   // e.g. If field f maps to function g, then g(x):Bool is a Term describing the condition under
   // which x:Ref is in the f-domain.
   type DomMap[K] = Map[K, Term => Term]
+
+  def translatePreconditionToDomain(pre: ast.Exp): Option[Term] = pre match {
+    case ast.PredicateAccessPredicate(ast.PredicateAccess(args, p), _) =>
+      val tArgs = expressionTranslator.translatePrecondition(program, args, this)
+      Some(PHeapSingletonPredicate(p, tArgs, PHeapLookupPredicate(p, `?h`, tArgs)))
+    case ast.And(e1, e2) =>
+    translatePreconditionToDomain(e1).flatMap(d1 => {
+      translatePreconditionToDomain(e2).map(d2 => PHeapCombine(d1, d2))
+      })
+    case ast.FieldAccessPredicate(ast.FieldAccess(x, f), _) =>
+      val tx = expressionTranslator.translatePrecondition(program, Seq(x), this)(0)
+      Some(PHeapSingletonField(f.name,tx, PHeapLookupField(f.name, symbolConverter.toSort(f.typ), `?h`, tx)))
+    case ast.CondExp(iff, thn, els) =>
+      val tIff = expressionTranslator.translatePrecondition(program, Seq(iff), this)(0)
+      translatePreconditionToDomain(thn).flatMap(dthn => {
+        translatePreconditionToDomain(els).map(dels => Ite(tIff, dthn, dels))
+      })
+    case ast.Implies(prem, conc) =>
+      translatePreconditionToDomain(conc).map(dConc => {
+        val tPerm = expressionTranslator.translatePrecondition(program, Seq(prem), this)(0)
+        Ite(tPerm, dConc, predef.Emp)
+      })
+    case e: ast.InhaleExhaleExp =>
+      translatePreconditionToDomain(e.whenExhaling)
+    case ast.Let(v,e,body) =>
+      translatePreconditionToDomain(body.replace(v.localVar, e))
+    case a =>
+      if (a.isPure) Some(predef.Emp) else None //sys.error("Cannot translatePreconditionToDomain() of " + a.toString + " of type " + a.getClass)
+  }
   
   def restrictHeapAxiom() : Term = {
-    val pre = if (programFunction.pres.isEmpty) ast.BoolLit(true)() else programFunction.pres.reduce((p1,p2) => ast.And(p1,p2)())
-    val fieldDoms : DomMap[ast.Field] = getFieldDoms(pre)
 
-    val predDoms : DomMap[ast.Predicate] = getPredDoms(pre)
+    val translatedDomains = programFunction.pres.map(pre => {
+        translatePreconditionToDomain(pre)    
+    })
 
-    val d1 = predDoms.iterator.map({ case (p, dom) => {
-      val pArgs = p.formalArgs.map(x => Var(identifierFactory.fresh(x.name), symbolConverter.toSort(x.typ)))
-      val x = Var(identifierFactory.fresh("loc"), sorts.Loc)
+    val preContainsQP = translatedDomains.exists(d => d.isEmpty)
 
-      Forall( arguments
-            , Forall( pArgs
-                    , Let(x, PHeapPredicateLoc(p.name, pArgs),
-                        And( Iff(SetIn(x, PHeapPredicateDomain(p.name, restrictHeapApplication)), dom(   PHeapPredicateLoc(p.name, pArgs)  ))
-                           , Implies(SetIn(x, PHeapPredicateDomain(p.name, restrictHeapApplication)), PHeapLookupPredicate(p.name, restrictHeapApplication, pArgs) === PHeapLookupPredicate(p.name, `?h`, pArgs))))
-                    , Seq( Trigger(SetIn(PHeapPredicateLoc(p.name, pArgs), PHeapPredicateDomain(p.name, restrictHeapApplication)))
-                         , Trigger(PHeapLookupPredicate(p.name, restrictHeapApplication, pArgs)))
-                    )
-            , Seq(Trigger(restrictHeapApplication))
-            , s"restrictHeapAxiom_dom_${p.name}[${function.id.name}]")
-    }}).foldLeft[Term](True())((d1,d2) => And(d1,d2))
+    if (!preContainsQP) {
+      val dom = if (programFunction.pres.isEmpty) predef.Emp else translatedDomains.map(_.get).reduce((h1, h2) => PHeapCombine(h1,h2))
+      return Forall(arguments, restrictHeapApplication === dom, Trigger(restrictHeapApplication), s"restrictHeapAxiom [${function.id.name}]")
+    } else {
+      val pre = if (programFunction.pres.isEmpty) ast.BoolLit(true)() else programFunction.pres.reduce((p1,p2) => ast.And(p1,p2)())
+      val fieldDoms : DomMap[ast.Field] = getFieldDoms(pre)
 
-    val d2 = fieldDoms.iterator.map({ case (ast.Field(name, typ), dom) => {
-      val x = Var(identifierFactory.fresh("x"), sorts.Ref)
-      val fSort = symbolConverter.toSort(typ)
+      val predDoms : DomMap[ast.Predicate] = getPredDoms(pre)
 
-      Forall( arguments
-            , Forall( Seq(x)
-                    , And( Iff(SetIn(x, PHeapFieldDomain(name, restrictHeapApplication)), dom(x))
-                         , PHeapLookupField(name, fSort, restrictHeapApplication, x) === PHeapLookupField(name, fSort, `?h`, x))
-                    , Seq( Trigger(PHeapLookupField(name, fSort, restrictHeapApplication, x))
-                         , Trigger(SetIn(x, PHeapFieldDomain(name, restrictHeapApplication)))))
-            , Seq(Trigger(restrictHeapApplication))
-            , s"restrictHeapAxiom_dom_${name}[${function.id.name}]")
-    }}).foldLeft[Term](True())((d1,d2) => And(d1,d2))
+      val d1 = predDoms.iterator.map({ case (p, dom) => {
+        val pArgs = p.formalArgs.map(x => Var(identifierFactory.fresh(x.name), symbolConverter.toSort(x.typ)))
+        val x = Var(identifierFactory.fresh("loc"), sorts.Loc)
 
-    And(d1, d2)
+        Forall( arguments
+              , Forall( pArgs
+                      , Let(x, PHeapPredicateLoc(p.name, pArgs),
+                          And( Iff(SetIn(x, PHeapPredicateDomain(p.name, restrictHeapApplication)), dom(   PHeapPredicateLoc(p.name, pArgs)  ))
+                            , Implies(SetIn(x, PHeapPredicateDomain(p.name, restrictHeapApplication)), PHeapLookupPredicate(p.name, restrictHeapApplication, pArgs) === PHeapLookupPredicate(p.name, `?h`, pArgs))))
+                      , Seq( Trigger(SetIn(PHeapPredicateLoc(p.name, pArgs), PHeapPredicateDomain(p.name, restrictHeapApplication)))
+                          , Trigger(PHeapLookupPredicate(p.name, restrictHeapApplication, pArgs)))
+                      )
+              , Seq(Trigger(restrictHeapApplication))
+              , s"restrictHeapAxiom_dom_${p.name}[${function.id.name}]")
+      }}).foldLeft[Term](True())((d1,d2) => And(d1,d2))
+
+      val d2 = fieldDoms.iterator.map({ case (ast.Field(name, typ), dom) => {
+        val x = Var(identifierFactory.fresh("x"), sorts.Ref)
+        val fSort = symbolConverter.toSort(typ)
+
+        Forall( arguments
+              , Forall( Seq(x)
+                      , And( Iff(SetIn(x, PHeapFieldDomain(name, restrictHeapApplication)), dom(x))
+                          , PHeapLookupField(name, fSort, restrictHeapApplication, x) === PHeapLookupField(name, fSort, `?h`, x))
+                      , Seq( Trigger(PHeapLookupField(name, fSort, restrictHeapApplication, x))
+                          , Trigger(SetIn(x, PHeapFieldDomain(name, restrictHeapApplication)))))
+              , Seq(Trigger(restrictHeapApplication))
+              , s"restrictHeapAxiom_dom_${name}[${function.id.name}]")
+      }}).foldLeft[Term](True())((d1,d2) => And(d1,d2))
+
+      return And(d1, d2)
+    }
   }
 
   def getQPInversesMap(pre: ast.Exp): QPinvMap = pre match {
