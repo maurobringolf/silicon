@@ -217,7 +217,9 @@ class FunctionData(val programFunction: ast.Function,
       val tRcv = expressionTranslator.translatePrecondition(program, Seq(rcv), this).head
       Map(f -> (x => x === tRcv))
     }
-    case n@QuantifiedPermissionAssertion(forall, cond, ast.FieldAccessPredicate(ast.FieldAccess(rcv: ast.Exp, f: ast.Field), p: ast.Exp)) => {
+    case ast.PredicateAccessPredicate(_, _) =>
+      toMap(program.fields.zip(Seq.fill(program.fields.length){(_:Term) => False()}))
+    case QuantifiedPermissionAssertion(forall, cond, ast.FieldAccessPredicate(ast.FieldAccess(rcv: ast.Exp, f: ast.Field), p: ast.Exp)) => {
       val (inv, invAx) = qpInversesMap(n.getPrettyMetadata._1)
       val proxyFa = ast.Forall(forall.variables, Seq(), ast.And(cond, ast.GtCmp(p, ast.IntLit(0)())())())()
       val Seq(tFa) = expressionTranslator.translatePrecondition(program, Seq(proxyFa), this)
@@ -225,7 +227,10 @@ class FunctionData(val programFunction: ast.Function,
       val i = tFa.asInstanceOf[Quantification].vars.head
       Map(f -> (r => tFa.asInstanceOf[Quantification].body.replace(i, App(inv, r +: arguments.tail))))
     }
-    case a => toMap(program.fields.zip(Seq.fill(program.fields.length){(_:Term) => False()}))
+    case a => if (a.isPure)
+                toMap(program.fields.zip(Seq.fill(program.fields.length){(_:Term) => False()}))
+              else
+                sys.error("Cannot getFieldDoms() of " + a.toString)
   }
 
   def getPredDoms(pre: ast.Exp): DomMap[ast.Predicate] = pre match {
@@ -240,7 +245,14 @@ class FunctionData(val programFunction: ast.Function,
         //x === PHeapPredicateLoc(p, tArgs)
       }))
     }
-    case a => Map.empty
+    case ast.FieldAccessPredicate(_, _) =>
+      toMap(program.predicates.zip(Seq.fill(program.fields.length){(_:Term) => False()}))
+    case QuantifiedPermissionAssertion(_, _, ast.FieldAccessPredicate(_,_)) => 
+      toMap(program.predicates.zip(Seq.fill(program.fields.length){(_:Term) => False()}))
+    case a => if (a.isPure)
+                toMap(program.predicates.zip(Seq.fill(program.fields.length){(_:Term) => False()}))
+              else
+                sys.error("Cannot getPredDoms() of " + a.toString)
   }
 
   /*
