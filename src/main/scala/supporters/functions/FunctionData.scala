@@ -171,6 +171,8 @@ class FunctionData(val programFunction: ast.Function,
 
   def getQPInversesMap(pre: ast.Exp): QPinvMap = pre match {
     case ast.And(e1,e2) => getQPInversesMap(e1) ++ getQPInversesMap(e2)
+    case ast.CondExp(cond,e1,e2) => getQPInversesMap(e1) ++ getQPInversesMap(e2)
+    case ast.Implies(prem, conc) => getQPInversesMap(conc)
     case node@QuantifiedPermissionAssertion(forall,cond,ast.FieldAccessPredicate(ast.FieldAccess(rcv: ast.Exp, f: ast.Field), perm: ast.Exp)) => {
       val qSort = symbolConverter.toSort(forall.variables.head.typ)
 
@@ -179,7 +181,7 @@ class FunctionData(val programFunction: ast.Function,
       val Seq(tFa, tRcv, tCond, tPerm) = expressionTranslator.translatePrecondition(program, Seq(proxyFa, rcv, cond, perm), this)
       val qi = tFa.asInstanceOf[Quantification].vars.head
 
-      // TODO: Use better naming, probably just line number
+      // TODO: Use better naming, probably just line number + column
       val inv = Fun( Identifier("inv_" ++ node.getPrettyMetadata._1.toString)
                    , sorts.Ref +: arguments.tail.map(_.sort)
                    , qSort)
@@ -203,9 +205,9 @@ class FunctionData(val programFunction: ast.Function,
     case _ => Map.empty
   }
 
-  def mergeDoms[K](fd1: DomMap[K] , fd2: DomMap[K]) : DomMap[K] = {
+  def mergeDoms[K](fd1: DomMap[K] , fd2: DomMap[K], merger: (Term, Term) => Term = Or(_,_)) : DomMap[K] = {
     val fs = fd1.keySet ++ fd2.keySet
-    toMap(fs.map(k => (k, ((x:Term) => Or(
+    toMap(fs.map(k => (k, ((x:Term) => merger(
       fd1.getOrElse(k, (_:Term) => False())(x),
       fd2.getOrElse(k, (_:Term) => False())(x),
     )))))
@@ -217,9 +219,7 @@ class FunctionData(val programFunction: ast.Function,
       val tRcv = expressionTranslator.translatePrecondition(program, Seq(rcv), this).head
       Map(f -> (x => x === tRcv))
     }
-    case ast.PredicateAccessPredicate(_, _) =>
-      toMap(program.fields.zip(Seq.fill(program.fields.length){(_:Term) => False()}))
-    case QuantifiedPermissionAssertion(forall, cond, ast.FieldAccessPredicate(ast.FieldAccess(rcv: ast.Exp, f: ast.Field), p: ast.Exp)) => {
+    case n@QuantifiedPermissionAssertion(forall, cond, ast.FieldAccessPredicate(ast.FieldAccess(rcv: ast.Exp, f: ast.Field), p: ast.Exp)) => {
       val (inv, invAx) = qpInversesMap(n.getPrettyMetadata._1)
       val proxyFa = ast.Forall(forall.variables, Seq(), ast.And(cond, ast.GtCmp(p, ast.IntLit(0)())())())()
       val Seq(tFa) = expressionTranslator.translatePrecondition(program, Seq(proxyFa), this)
@@ -227,6 +227,19 @@ class FunctionData(val programFunction: ast.Function,
       val i = tFa.asInstanceOf[Quantification].vars.head
       Map(f -> (r => tFa.asInstanceOf[Quantification].body.replace(i, App(inv, r +: arguments.tail))))
     }
+    case ast.PredicateAccessPredicate(_, _) =>
+      toMap(program.fields.zip(Seq.fill(program.fields.length){(_:Term) => False()}))
+    case ast.CondExp(cond,e1,e2) =>
+      val tCond = expressionTranslator.translatePrecondition(program, Seq(cond), this).head
+      val e1Dom = getFieldDoms(e1)
+      val e2Dom = getFieldDoms(e2)
+      mergeDoms(e1Dom, e2Dom, Ite(tCond, _, _))
+    case ast.Implies(prem, conc) =>
+      val tCond = expressionTranslator.translatePrecondition(program, Seq(prem), this).head
+      val concDom = getFieldDoms(conc)
+      mergeDoms( concDom
+               , toMap(program.fields.zip(Seq.fill(program.fields.length){(_:Term) => False()}))
+               , Ite(tCond, _, _))
     case a => if (a.isPure)
                 toMap(program.fields.zip(Seq.fill(program.fields.length){(_:Term) => False()}))
               else
@@ -249,6 +262,18 @@ class FunctionData(val programFunction: ast.Function,
       toMap(program.predicates.zip(Seq.fill(program.fields.length){(_:Term) => False()}))
     case QuantifiedPermissionAssertion(_, _, ast.FieldAccessPredicate(_,_)) => 
       toMap(program.predicates.zip(Seq.fill(program.fields.length){(_:Term) => False()}))
+    case ast.CondExp(cond,e1,e2) =>
+      val tCond = expressionTranslator.translatePrecondition(program, Seq(cond), this).head
+      val e1Dom = getPredDoms(e1)
+      val e2Dom = getPredDoms(e2)
+      mergeDoms(e1Dom, e2Dom, Ite(tCond, _, _))
+    case ast.Implies(prem, conc) =>
+      val tCond = expressionTranslator.translatePrecondition(program, Seq(prem), this).head
+      val concDom = getPredDoms(conc)
+      mergeDoms( concDom
+               , toMap(program.predicates.zip(Seq.fill(program.fields.length){(_:Term) => False()}))
+               , Ite(tCond, _, _))
+
     case a => if (a.isPure)
                 toMap(program.predicates.zip(Seq.fill(program.fields.length){(_:Term) => False()}))
               else
