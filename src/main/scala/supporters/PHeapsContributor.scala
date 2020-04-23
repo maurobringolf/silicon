@@ -181,8 +181,18 @@ class DefaultPHeapsContributor(preambleReader: PreambleReader[String, String],
     val r = Var(Identifier("r"), sorts.Ref)
     val pHeap_equal = Fun(Identifier("PHeap.equal"), Seq(sorts.PHeap, sorts.PHeap), sorts.Bool)
 
-    // TODO
-    val equalOnPredicates = True()
+    def equalOnPred(p: ast.Predicate) : Term = {
+      val l = Var(Identifier("l"), sorts.Loc)
+      val lk1 = App(Fun(Identifier("PHeap.lookup_" ++ p.name), Seq(sorts.PHeap, sorts.Loc), sorts.PHeap), Seq(h1, l))
+      val lk2 = App(Fun(Identifier("PHeap.lookup_" ++ p.name), Seq(sorts.PHeap, sorts.Loc), sorts.PHeap), Seq(h2, l))
+      And( SetEqual(PHeapPredicateDomain(p.name, h1), PHeapPredicateDomain(p.name, h2))
+         , Forall( Seq(l)
+                 , Implies( SetIn(l, PHeapPredicateDomain(p.name, h1))
+                          , App(pHeap_equal, Seq(lk1, lk2)))
+                 , Seq(Trigger(Seq(lk1, lk2)))
+         )
+      )
+    }
 
     def equalOnField(f: ast.Field) : Term = {
       val fSort = symbolConverter.toSort(f.typ)
@@ -195,6 +205,7 @@ class DefaultPHeapsContributor(preambleReader: PreambleReader[String, String],
       )
     }
 
+    val equalOnPredicates = predicates.foldLeft[Term](True())((ax, p) => And(ax, equalOnPred(p)))
     val equalOnFields = fields.foldLeft[Term](True())((ax, f) => And(ax, equalOnField(f)))
     
     functions.map(g => {
