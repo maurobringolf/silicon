@@ -150,12 +150,12 @@ class DefaultMasterVerifier(config: Config, override val reporter: Reporter)
 
     Verifier.program = program
 
-    if((program.methods ++ program.functions ++ program.predicates).map(x => {
+    /*if((program.methods ++ program.functions ++ program.predicates).map(x => {
       val sCheck = createInitialState(x, program)
       isSupported(sCheck)
     }).exists(!_)) {
       return List(UnsupportedInput())
-    }
+    }*/
 
     predSnapGenerator.setup(program) // TODO: Why did Nadja put this here?
 

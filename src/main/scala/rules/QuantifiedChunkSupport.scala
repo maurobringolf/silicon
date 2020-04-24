@@ -532,7 +532,7 @@ object quantifiedChunkSupporter extends QuantifiedChunkSupport with Immutable {
                              codomainQVars: Seq[Var],
                              relevantChunks: Seq[QuantifiedBasicChunk],
                              v: Verifier,
-                             optSmDomainDefinitionCondition: Option[Term] = None,
+                             optSmDomainDefinitionCondition: Option[Term] = Some(True()),
                              optQVarsInstantiations: Option[Seq[Term]] = None)
                             : (SnapshotMapDefinition, SnapshotMapCache) = {
 
@@ -685,6 +685,7 @@ object quantifiedChunkSupporter extends QuantifiedChunkSupport with Immutable {
     val ax = inverseFunctions.axiomInversesOfInvertibles
     val inv = inverseFunctions.copy(axiomInversesOfInvertibles = Forall(ax.vars, ax.body, effectiveTriggers))
 
+
     v.decider.prover.comment("Definitional axioms for inverse functions")
     val definitionalAxiomMark = v.decider.setPathConditionMark()
     v.decider.assume(inv.definitionalAxioms)
@@ -726,6 +727,8 @@ object quantifiedChunkSupporter extends QuantifiedChunkSupport with Immutable {
     val qvarsToInv = inv.qvarsToInversesOf(codomainVars)
     val condOfInv = tCond.replace(qvarsToInv)
     v.decider.assume(Forall(codomainVars, Implies(condOfInv, trigger), Trigger(inv.inversesOf(codomainVars)))) //effectiveTriggers map (t => Trigger(t.p map (_.replace(qvarsToInv))))))
+
+    v.decider.assume(tSnap === smDef1.sm)
     val s1 =
       s.copy(h = h1,
              functionRecorder = s.functionRecorder.recordFieldInv(inv),
@@ -744,8 +747,11 @@ object quantifiedChunkSupporter extends QuantifiedChunkSupport with Immutable {
                             v: Verifier)
                            (Q: (State, Verifier) => VerificationResult)
                            : VerificationResult = {
-
-    val (sm, smValueDef) = quantifiedChunkSupporter.singletonSnapshotMap(s, resource, tArgs, tSnap, v)
+    val value = resource match {
+      case field: ast.Field => PHeapLookupField(field.name, v.symbolConverter.toSort(field.typ), tSnap, tArgs.head)
+      case _ => sys.error("not implemented")
+    }
+    val (sm, smValueDef) = quantifiedChunkSupporter.singletonSnapshotMap(s, resource, tArgs, value, v)
     v.decider.prover.comment("Definitional axioms for singleton-SM's value")
     val definitionalAxiomMark = v.decider.setPathConditionMark()
     v.decider.assume(smValueDef)
@@ -923,8 +929,8 @@ object quantifiedChunkSupporter extends QuantifiedChunkSupport with Immutable {
                 (result, s4, h2, Some(consumedChunk))
               })((s4, optCh, v3) =>
                 optCh match {
-                  case Some(ch) => Q(s4, s4.h, ch.snapshotMap.convert(sorts.Snap), v3)
-                  case _ => Q(s4, s4.h, v3.decider.fresh(sorts.Snap), v3)
+                  case Some(ch) => Q(s4, s4.h, FVFToPHeap(qid, ch.snapshotMap), v3)
+                  case _ => Q(s4, s4.h, v3.decider.fresh(sorts.PHeap), v3)
                 }
               )
             } else {
@@ -954,7 +960,7 @@ object quantifiedChunkSupporter extends QuantifiedChunkSupport with Immutable {
                                    partiallyConsumedHeap = Some(h3),
                                    constrainableARPs = s.constrainableARPs,
                                    smCache = smCache2)
-                  Q(s3, h3, smDef2.sm.convert(sorts.Snap), v)
+                  Q(s3, h3, FVFToPHeap(qid, smDef2.sm), v)
                 case (Incomplete(_), _, _) =>
                   Failure(pve dueTo insufficientPermissionReason)}
             }
@@ -1075,7 +1081,12 @@ object quantifiedChunkSupporter extends QuantifiedChunkSupport with Immutable {
               v = v)
           val s2 = s1.copy(functionRecorder = s1.functionRecorder.recordFvfAndDomain(smDef1),
                            smCache = smCache1)
-          val snap = ResourceLookup(resource, smDef1.sm, arguments).convert(sorts.Snap)
+          val snapVal = ResourceLookup(resource, smDef1.sm, arguments)
+          val snap = resource match {
+            case field: ast.Field => PHeapSingletonField(field.name, arguments.head, snapVal)
+            //case _: ast.Predicate | _: ast.MagicWand => PredicateDomain
+            case other => sys.error(s"Not implemented")
+          }
           Q(s2, h1, snap, v)
         case (Incomplete(_), _, _) =>
           failure

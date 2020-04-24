@@ -199,6 +199,7 @@ class TermToSMTLib2Converter
     case bop: SetIntersection => renderApp("Set_intersection", Seq(bop.p0, bop.p1), bop.sort)
     case bop: SetUnion => renderApp("Set_union", Seq(bop.p0, bop.p1), bop.sort)
     case bop: SetIn => renderApp("Set_in", Seq(bop.p0, bop.p1), bop.sort)
+    case bop: SetEqual => renderApp("Set_equal", Seq(bop.p0, bop.p1), bop.sort)
     case bop: SetSubset => renderApp("Set_subset", Seq(bop.p0, bop.p1), bop.sort)
     case bop: SetDisjoint => renderApp("Set_disjoint", Seq(bop.p0, bop.p1), bop.sort)
 
@@ -216,6 +217,7 @@ class TermToSMTLib2Converter
     /* PHeaps */
 
     case PHeapLookupField(f, _, h, x) => parens(text("PHeap.lookup_") <> f <+> render(h) <+> render(x))
+    case PHeapFieldDomain(f, h) => parens(text("PHeap.dom_") <> f <+> render(h))
     case PHeapLookupPredicate(p, h, args) => parens(text("PHeap.lookup_") <> p <+> render(h) <+> (
       if (args.length > 0) {
         parens(text("PHeap.loc_") <> p <+> args.map(a => convert(a)).mkString(" "))
@@ -229,9 +231,17 @@ class TermToSMTLib2Converter
     case PHeapSingletonPredicate(p, args, h) => parens(text("PHeap.singleton_") <> p <+> args.map(a => convert(a)).mkString(" ") <+> render(h))
     case PHeapRestrict(f, h, args) => parens(text("PHeap.restrict_") <> f <+> convert(h) <+> args.map(a => convert(a)).mkString(" "))
 
+    case PHeapPredicateLoc(p, args) => parens(text("PHeap.loc_") <> p <+> args.map(convert).mkString(" "))
+
+    case PHeapPredicateDomain(p, h) => parens(text("PHeap.dom_") <> p <+> convert(h))
+
     /* Quantified Permissions */
 
     case Domain(id, fvf) => parens(text("$FVF.domain_") <> id <+> render(fvf))
+
+    case FVFToPHeap(id, fvf) => parens(text("$FVF.toPHeap_") <> id <+> render(fvf))
+
+    case PHeapToFVF(field, fieldSort, h) => parens(text("PHeap.toFVF_") <> field <+> render(h))
 
     case Lookup(field, fvf, at) => //fvf.sort match {
 //      case _: sorts.PartialFieldValueFunction =>

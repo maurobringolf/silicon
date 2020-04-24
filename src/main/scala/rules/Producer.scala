@@ -339,6 +339,9 @@ object producer extends ProductionRules with Immutable {
         evalQuantified(s, Forall, forall.variables, Seq(cond), Seq(acc.loc.rcv, acc.perm), optTrigger, qid, pve, v) {
           case (s1, qvars, Seq(tCond), Seq(tRcvr, tPerm), tTriggers, (auxGlobals, auxNonGlobals), v1) =>
 //            v.decider.assume(PermAtMost(tPerm, FullPerm()))
+            val fSort = v1.symbolConverter.toSort(acc.loc.field.typ)
+            //val snapFvf = v1.decider.fresh("peng1", sorts.FieldValueFunction(fSort))
+            //v1.decider.assume(FVFToPHeap(qid, snapFvf) === snap)
             quantifiedChunkSupporter.produce(
               s1,
               forall,
@@ -350,7 +353,7 @@ object producer extends ProductionRules with Immutable {
               auxNonGlobals,
               tCond,
               Seq(tRcvr),
-              snap,
+              PHeapToFVF(qid, fSort, snap),
               tPerm,
               v1
             )(Q)
