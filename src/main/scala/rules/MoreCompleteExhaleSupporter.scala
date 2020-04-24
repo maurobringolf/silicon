@@ -53,8 +53,8 @@ object moreCompleteExhaleSupporter extends Immutable {
     val sort: Sort =
       resource match {
         case f: ast.Field => v.symbolConverter.toSort(f.typ)
-        case _: ast.Predicate => sorts.Snap
-        case _: ast.MagicWand => sorts.Snap
+        case _: ast.Predicate => sorts.PHeap
+        case _: ast.MagicWand => sorts.PHeap
       }
 
     val `?s` = Var(Identifier("?s"), sort)

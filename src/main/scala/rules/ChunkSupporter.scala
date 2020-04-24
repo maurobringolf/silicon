@@ -82,7 +82,7 @@ object chunkSupporter extends ChunkSupportRules with Immutable {
              * branch, or that the permission amount to consume was zero.
              * Returning a fresh snapshot in these cases should not lose any information.
              */
-            val fresh = v2.decider.fresh(sorts.Snap)
+            val fresh = v2.decider.fresh(sorts.PHeap)
             val s3 = s2.copy(functionRecorder = s2.functionRecorder.recordFreshSnapshot(fresh.applicable))
             QS(s3, h2, fresh, v2)
         })

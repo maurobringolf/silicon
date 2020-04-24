@@ -924,7 +924,7 @@ object quantifiedChunkSupporter extends QuantifiedChunkSupport with Immutable {
               })((s4, optCh, v3) =>
                 optCh match {
                   case Some(ch) => Q(s4, s4.h, ch.snapshotMap.convert(sorts.Snap), v3)
-                  case _ => Q(s4, s4.h, v3.decider.fresh(sorts.Snap), v3)
+                  case _ => Q(s4, s4.h, v3.decider.fresh(sorts.PHeap), v3)
                 }
               )
             } else {
@@ -1044,7 +1044,7 @@ object quantifiedChunkSupporter extends QuantifiedChunkSupport with Immutable {
             val snap = ResourceLookup(resource, ch.snapshotMap, arguments).convert(sorts.Snap)
             Q(s3, s3.h, snap, v2)
           case _ =>
-            Q(s3, s3.h, v2.decider.fresh(sorts.Snap), v2)
+            Q(s3, s3.h, v2.decider.fresh(sorts.PHeap), v2)
         }
       )
     } else {
@@ -1261,7 +1261,7 @@ object quantifiedChunkSupporter extends QuantifiedChunkSupport with Immutable {
           // TODO: Reconsider use of and general design behind s.predicateSnapMap
           sorts.PredicateSnapFunction(s.predicateSnapMap(predicate))
         case _: ast.MagicWand =>
-          sorts.PredicateSnapFunction(sorts.Snap)
+          sorts.PredicateSnapFunction(sorts.PHeap)
         case _ =>
           sys.error(s"Found yet unsupported resource $resource (${resource.getClass.getSimpleName})")
       }
