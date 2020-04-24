@@ -1688,6 +1688,20 @@ object Second extends (Term => Term) {
 
 sealed trait PHeapTerm extends Term { override val sort = sorts.PHeap }
 
+class PHeapMWS(val lhs: Term, val rhs: Term) extends PHeapTerm
+
+object PHeapMWS extends ((Term, Term) => Term) {
+  def apply(lhs: Term, rhs: Term) : Term = (lhs,rhs) match {
+    case (_,_) => new PHeapMWS(lhs,rhs)
+  }
+
+  def unapply(c: PHeapMWS) = Some((c.lhs, c.rhs))
+}
+
+case class PHeapRHS(val mws: Term) extends PHeapTerm
+
+case class PHeapLHS(val mws: Term) extends PHeapTerm
+
 case class PHeapCombine(val h1: Term, val h2: Term) extends PHeapTerm
 
 object PHeapCombine extends ((Term, Term) => Term) {
@@ -1697,7 +1711,7 @@ object PHeapCombine extends ((Term, Term) => Term) {
     case (_,_) => new PHeapCombine(h1,h2)
   }
 
-  def unappyl(c: PHeapCombine) = Some((c.h1, c.h2))
+  def unapply(c: PHeapCombine) = Some((c.h1, c.h2))
 }
 
 case class PHeapLookupField(val field: String, val sort: Sort, val h: Term, val at: Term) extends Term
@@ -1785,9 +1799,9 @@ case class PredicateTrigger(predname: String, psf: Term, args: Seq[Term]) extend
 
 /* Magic wands */
 
-case class MagicWandSnapshot(abstractLhs: Term, rhsSnapshot: Term) extends Combine(abstractLhs, rhsSnapshot) {
-  utils.assertSort(abstractLhs, "abstract lhs", sorts.Snap)
-  utils.assertSort(rhsSnapshot, "rhs", sorts.Snap)
+case class MagicWandSnapshot(abstractLhs: Term, rhsSnapshot: Term) extends PHeapMWS(abstractLhs, rhsSnapshot) {
+  utils.assertSort(abstractLhs, "abstract lhs", sorts.PHeap)
+  utils.assertSort(rhsSnapshot, "rhs", sorts.PHeap)
 
   override lazy val toString = s"wandSnap(lhs = $abstractLhs, rhs = $rhsSnapshot)"
 
@@ -1803,17 +1817,16 @@ case class MagicWandSnapshot(abstractLhs: Term, rhsSnapshot: Term) extends Combi
 
 object MagicWandSnapshot {
   def apply(snapshot: Term): MagicWandSnapshot = {
-    assert(snapshot.sort == sorts.Snap)
+    assert(snapshot.sort == sorts.PHeap)
     snapshot match {
       case snap: MagicWandSnapshot => snap
       case _ =>
-        MagicWandSnapshot(First(snapshot), Second(snapshot))
+        MagicWandSnapshot(PHeapLHS(snapshot), PHeapRHS(snapshot))
     }
   }
 }
 
-case class MagicWandChunkTerm(chunk: MagicWandChunk) extends Term {
-  override val sort = sorts.Unit /* TODO: Does this make sense? */
+case class MagicWandChunkTerm(chunk: MagicWandChunk) extends PHeapTerm {
   override lazy val toString = s"wand@${chunk.id.ghostFreeWand.pos}}"
 }
 

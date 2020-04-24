@@ -215,6 +215,11 @@ class TermToSMTLib2Converter
 
     /* PHeaps */
 
+    //case MagicWandSnapshot(abstractLhs, rhsSnapshot) => 
+    case PHeapMWS(lhs, rhs) => parens(text("PHeap.MWS") <+> render(lhs) <+> render(rhs))
+    case PHeapLHS(mws) => parens(text("PHeap.LHS") <+> render(mws))
+    case PHeapRHS(mws) => parens(text("PHeap.RHS") <+> render(mws))
+
     case PHeapLookupField(f, _, h, x) => parens(text("PHeap.lookup_") <> f <+> render(h) <+> render(x))
     case PHeapLookupPredicate(p, h, args) => parens(text("PHeap.lookup_") <> p <+> render(h) <+> (
       if (args.length > 0) {
