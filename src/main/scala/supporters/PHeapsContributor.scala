@@ -13,6 +13,8 @@ import viper.silicon.interfaces.{PreambleContributor, PreambleReader}
 import viper.silicon.interfaces.decider.{ProverLike, TermConverter}
 import viper.silicon.state.SymbolConverter
 import viper.silicon.state.terms.{SortDecl, sorts}
+import viper.silicon.state.Identifier
+import viper.silicon.state.terms._
 
 trait PHeapsContributor[SO, SY, AX] extends PreambleContributor[SO, SY, AX]
 
@@ -27,6 +29,8 @@ class DefaultPHeapsContributor(preambleReader: PreambleReader[String, String],
 
   private var collectedFunctionDecls: Iterable[PreambleBlock] = Seq.empty
   private var collectedAxioms: Iterable[PreambleBlock] = Seq.empty
+
+  private var astAxioms: Iterable[Term] = Seq.empty
 
   private def fieldSubstitutions(f: ast.Field) : Map[String, String] = {
     val sort = symbolConverter.toSort(f.typ)
@@ -90,6 +94,7 @@ class DefaultPHeapsContributor(preambleReader: PreambleReader[String, String],
       predicateSingletonPredicateDomains(program.predicates) ++
       fieldSingletonPredicateDomains(program.predicates, program. fields) ++
       fieldSingletonFieldDomains(program.fields)
+    astAxioms = extensional_equality(program.predicates, program.fields, program.functions)
   }
 
   private def extractPreambleLines(from: Iterable[PreambleBlock]*): Iterable[String] =
@@ -166,6 +171,57 @@ class DefaultPHeapsContributor(preambleReader: PreambleReader[String, String],
     Seq((s"PHeap.symmetry_combine", preambleReader.readPreamble(templateFile)))
   }
 
+  // TODO: Extend the meta syntax as needed to write this in SMT-LIB
+  def extensional_equality( predicates: Seq[ast.Predicate]
+                          , fields: Seq[ast.Field]
+                          , functions: Seq[ast.Function]
+                          ): Iterable[Term] = {
+    val h1 = Var(Identifier("h1"), sorts.PHeap)
+    val h2 = Var(Identifier("h2"), sorts.PHeap)
+    val r = Var(Identifier("r"), sorts.Ref)
+    val pHeap_equal = Fun(Identifier("PHeap.equal"), Seq(sorts.PHeap, sorts.PHeap), sorts.Bool)
+
+    def equalOnPred(p: ast.Predicate) : Term = {
+      val l = Var(Identifier("l"), sorts.Loc)
+      val lk1 = App(Fun(Identifier("PHeap.lookup_" ++ p.name), Seq(sorts.PHeap, sorts.Loc), sorts.PHeap), Seq(h1, l))
+      val lk2 = App(Fun(Identifier("PHeap.lookup_" ++ p.name), Seq(sorts.PHeap, sorts.Loc), sorts.PHeap), Seq(h2, l))
+      And( SetEqual(PHeapPredicateDomain(p.name, h1), PHeapPredicateDomain(p.name, h2))
+         , Forall( Seq(l)
+                 , Implies( SetIn(l, PHeapPredicateDomain(p.name, h1))
+                          , App(pHeap_equal, Seq(lk1, lk2)))
+                 , Seq(Trigger(Seq(lk1, lk2)))
+         )
+      )
+    }
+
+    def equalOnField(f: ast.Field) : Term = {
+      val fSort = symbolConverter.toSort(f.typ)
+      And( SetEqual(PHeapFieldDomain(f.name, h1), PHeapFieldDomain(f.name, h2))
+         , Forall( Seq(r)
+                 , Implies( SetIn(r, PHeapFieldDomain(f.name, h1))
+                          , PHeapLookupField(f.name, fSort, h1, r) === PHeapLookupField(f.name, fSort, h2, r))
+                 , Seq( Trigger(Seq(PHeapLookupField(f.name, fSort, h1, r), PHeapLookupField(f.name, fSort, h2, r))))
+                 )
+      )
+    }
+
+    val equalOnPredicates = predicates.foldLeft[Term](True())((ax, p) => And(ax, equalOnPred(p)))
+    val equalOnFields = fields.foldLeft[Term](True())((ax, f) => And(ax, equalOnField(f)))
+    
+    functions.map(g => {
+      // TODO: This contains a lot of duplication with the function supporter and relies on its internals.
+      // Somehow make it reuse that code.
+      val argSorts = g.formalArgs.map(x => symbolConverter.toSort(x.typ))
+      val resultSort = symbolConverter.toSort(g.typ)
+      val args = g.formalArgs.map(x => Var(Identifier(x.name), symbolConverter.toSort(x.typ)))
+      val eqAx = Forall( Seq(h1, h2) ++ args
+                      , Implies(And(equalOnFields, equalOnPredicates), (App(HeapDepFun(Identifier(g.name ++ "%limited"), sorts.PHeap +: argSorts, resultSort), h1 +: args) === App(HeapDepFun(Identifier(g.name ++ "%limited"), sorts.PHeap +: argSorts, resultSort), h2 +: args)))
+                      , Seq(Trigger(Seq( App(HeapDepFun(Identifier(g.name ++ "%limited"), sorts.PHeap +: argSorts, resultSort), h1 +: args)
+                                       , App(HeapDepFun(Identifier(g.name ++ "%limited"), sorts.PHeap +: argSorts, resultSort), h2 +: args)))))
+      eqAx
+    })
+  }
+
   def predicateSingletonFieldDomains(predicates: Seq[ast.Predicate], fields: Seq[ast.Field]): Iterable[PreambleBlock] = {
     val templateFile = "/pheap/predicate_singleton_field_domain.smt2"
 
@@ -239,8 +295,10 @@ class DefaultPHeapsContributor(preambleReader: PreambleReader[String, String],
   val axiomsAfterAnalysis: Iterable[String] =
     extractPreambleLines(collectedAxioms)
 
-  def emitAxiomsAfterAnalysis(sink: ProverLike): Unit =
+  def emitAxiomsAfterAnalysis(sink: ProverLike): Unit = {
+    astAxioms.map(ax => sink.assume(ax))
     emitPreambleLines(sink, collectedAxioms)
+  }
 
   def updateGlobalStateAfterAnalysis(): Unit = { /* Nothing to contribute*/ }
 }

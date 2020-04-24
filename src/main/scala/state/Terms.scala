@@ -1484,6 +1484,17 @@ object SetIn extends ((Term, Term) => BooleanTerm) {
   def unapply(si: SetIn) = Some((si.p0, si.p1))
 }
 
+class SetEqual(val p0: Term, val p1: Term) extends BooleanTerm
+    with StructuralEqualityBinaryOp[Term]
+
+object SetEqual extends ((Term, Term) => BooleanTerm) {
+  def apply(t0: Term, t1: Term) = {
+    new SetEqual(t0,t1)
+  }
+
+  def unapply(se: SetEqual) = Some((se.p0, se.p1))
+}
+
 class SetCardinality(val p: Term) extends Term
     with StructuralEqualityUnaryOp[Term] {
 
@@ -1725,6 +1736,29 @@ object PHeapLookupField extends ((String, Sort, Term, Term) => Term) {
   def unapply(lk: PHeapLookupField) = Some((lk.field, lk.sort, lk.h, lk.at))
 }
 
+case class PHeapFieldDomain(val field: String, val h: Term) extends Term {
+  val sort = sorts.Set(sorts.Ref)
+}
+
+object PHeapFieldDomain extends ((String, Term) => Term) {
+  def apply(field: String, h: Term) = h match {
+    // TODO syntactic optimization
+    case _ => new PHeapFieldDomain(field, h)
+  }
+
+  def unapply(lk: PHeapFieldDomain) = Some((lk.field, lk.h))
+}
+
+class PHeapPredicateLoc(val predicate: String, val args: Seq[Term]) extends Term {
+  val sort = sorts.Loc
+}
+
+object PHeapPredicateLoc extends ((String, Seq[Term]) => Term) {
+  def apply(predicate: String, args: Seq[Term]) = new PHeapPredicateLoc(predicate, args)
+
+  def unapply(pl: PHeapPredicateLoc) = Some((pl.predicate, pl.args))
+}
+
 class PHeapLookupPredicate(val predicate: String, val h: Term, val args: Seq[Term]) extends PHeapTerm
 
 object PHeapLookupPredicate extends ((String, Term, Seq[Term]) => Term) {
@@ -1736,12 +1770,26 @@ object PHeapLookupPredicate extends ((String, Term, Seq[Term]) => Term) {
   def unapply(lk: PHeapLookupPredicate) = Some((lk.predicate, lk.h, lk.args))
 }
 
+case class PHeapPredicateDomain(predicate: String, h: Term) extends Term {
+  val sort = sorts.Set(sorts.Loc)
+}
+
 case class PHeapRemovePredicate(predicate: String, h: Term, args: Seq[Term]) extends PHeapTerm
 case class PHeapSingletonField(field: String, x: Term, v: Term) extends PHeapTerm
 case class PHeapSingletonPredicate(predicate: String, args: Seq[Term], h: Term) extends PHeapTerm
 case class PHeapRestrict(fun: String, snap: Term, args: Seq[Term]) extends PHeapTerm
 
 /* Quantified permissions */
+
+case class FVFToPHeap(field: String, fvf: Term) extends Term {
+  utils.assertSort(fvf, "field value function", "FieldValueFunction", _.isInstanceOf[sorts.FieldValueFunction])
+  val sort = sorts.PHeap
+}
+
+case class PHeapToFVF(field: String, fieldSort: Sort, h: Term) extends Term {
+  utils.assertSort(h, "PHeap", sorts.PHeap)
+  val sort = sorts.FieldValueFunction(fieldSort)
+}
 
 case class Lookup(field: String, fvf: Term, at: Term) extends Term {
   utils.assertSort(fvf, "field value function", "FieldValueFunction", _.isInstanceOf[sorts.FieldValueFunction])

@@ -48,14 +48,16 @@ class DefaultFieldValueFunctionsContributor(preambleReader: PreambleReader[Strin
 
   def analyze(program: ast.Program) {
     /* TODO: Use viper.silver.ast.utility.QuantifiedPermissions.quantifiedFields instead? */
-    program visit {
+    // TODO: Uncommenting this is a workaround required for the embedding into PHeaps as it is done currently
+    /*program visit {
       case QuantifiedPermissionAssertion(_, _, acc: ast.FieldAccessPredicate) =>
         collectedFields += acc.loc.field
       case Forall(_, triggers, _) =>
         val trigExps = triggers flatMap (_.exps)
         val fieldAccesses = trigExps flatMap (e => e.deepCollect {case fa: FieldAccess => fa})
         collectedFields ++= (fieldAccesses map (_.field))
-    }
+    }*/
+    collectedFields = InsertionOrderedSet(program.fields)
 
     collectedSorts = (
         collectedFields.map(f => sorts.FieldValueFunction(symbolConverter.toSort(f.typ)))
