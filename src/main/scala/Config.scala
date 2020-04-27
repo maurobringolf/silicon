@@ -6,6 +6,8 @@
 
 package viper.silicon
 
+import viper.silicon.verifier.LanguageFeature
+
 import java.nio.file.{Path, Paths}
 import scala.util.matching.Regex
 import scala.util.Properties._
@@ -326,6 +328,21 @@ class Config(args: Seq[String]) extends SilFrontendConfig(args, "Silicon") {
     default = Some("./tmp"),
     noshort = true
   )
+
+  private val rawUnsupportedLanguageFeatures: ScallopOption[String] = opt[String]("unsupportedLanguageFeatures",
+    descr = "Reject programs that make use of certain language features (QP, MW)",
+    default = Some(""),
+    noshort = true
+  )
+
+  lazy val unsupportedLanguageFeatures : Seq[LanguageFeature.LanguageFeature] = {
+    rawUnsupportedLanguageFeatures().split(",").collect({
+      case "MW" => LanguageFeature.MagicWands
+      case "QP" => LanguageFeature.QuantifiedPermissions
+    })
+  }
+
+  def supportsLanguageFeature(lf: LanguageFeature.LanguageFeature) : Boolean = ! unsupportedLanguageFeatures.contains(lf)
 
   private val rawZ3Exe = opt[String]("z3Exe",
     descr = (  "Z3 executable. The environment variable %s can also "

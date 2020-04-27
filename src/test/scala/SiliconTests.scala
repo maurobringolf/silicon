@@ -11,7 +11,7 @@ import java.nio.file.Path
 import viper.silver.testing.{LocatedAnnotation, MissingOutput, SilSuite, UnexpectedOutput, TestError, TestAdditionalOutputError, SilOutput}
 import viper.silver.verifier.{AbstractError, Verifier, Failure => SilFailure, Success => SilSuccess, VerificationResult => SilVerificationResult, errors}
 import viper.silicon.{Silicon, SiliconFrontend, SymbExLogger}
-import viper.silicon.interfaces.UnsupportedInputReason
+import viper.silicon.interfaces.UnsupportedLanguageFeatureReason
 import viper.silver.frontend.DefaultStates
 import viper.silver.reporter.NoopReporter
 
@@ -21,7 +21,7 @@ class SiliconTests extends SilSuite {
   val testDirectories = siliconTestDirectories ++ silTestDirectories
 
   override def errorShouldLeadToTestCancel(err: TestError) = err match {
-    case TestAdditionalOutputError(SilOutput(errors.Internal(_,UnsupportedInputReason,_))) => true
+    case TestAdditionalOutputError(SilOutput(errors.Internal(_,UnsupportedLanguageFeatureReason,_))) => true
     case _ => super.errorShouldLeadToTestCancel(err)
   }
 

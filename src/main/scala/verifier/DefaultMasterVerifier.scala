@@ -150,11 +150,21 @@ class DefaultMasterVerifier(config: Config, override val reporter: Reporter)
 
     Verifier.program = program
 
+    // Check language features support
+    LanguageFeature.values.map(lf => {
+      (program.methods ++ program.functions ++ program.predicates).map(mfp => {
+        if ( !config.supportsLanguageFeature(lf)
+           // TODO: This api has a weird order
+           && LanguageFeature.isUsedBy(program, lf)) {
+          return List(UnsupportedLanguageFeature())
+        }
+      })
+    })
+
     /*if((program.methods ++ program.functions ++ program.predicates).map(x => {
       val sCheck = createInitialState(x, program)
       isSupported(sCheck)
     }).exists(!_)) {
-      return List(UnsupportedInput())
     }*/
 
     predSnapGenerator.setup(program) // TODO: Why did Nadja put this here?
