@@ -8,7 +8,6 @@ package viper.silicon.interfaces
 
 import viper.silver.verifier.{VerificationError, errors, DummyNode, AbstractErrorReason}
 import viper.silicon.state.terms.Term
-import viper.silicon.verifier.LanguageFeature.LanguageFeature
 
 /*
  * Results
@@ -87,17 +86,4 @@ case class Failure/*[ST <: Store[ST],
   override lazy val toString = message.readableMessage
 }
 
-object UnsupportedLanguageFeatureReason extends AbstractErrorReason {
-  val id = "unsupported language feature"
-  val readableMessage = "unsupported language feature"
-  val offendingNode = DummyNode
-  def withNode(offendingNode: errors.ErrorNode = this.offendingNode) = UnsupportedLanguageFeatureReason
-}
-
-object UnsupportedLanguageFeature {
-  def apply() = new Failure(new errors.Internal(
-    DummyNode,
-    UnsupportedLanguageFeatureReason
-  ))
-}
 

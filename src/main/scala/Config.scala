@@ -6,7 +6,7 @@
 
 package viper.silicon
 
-import viper.silicon.verifier.LanguageFeature
+import viper.silver.ast.utility.LanguageFeature
 
 import java.nio.file.{Path, Paths}
 import scala.util.matching.Regex
@@ -339,6 +339,9 @@ class Config(args: Seq[String]) extends SilFrontendConfig(args, "Silicon") {
     rawUnsupportedLanguageFeatures().split(",").collect({
       case "MW" => LanguageFeature.MagicWands
       case "QP" => LanguageFeature.QuantifiedPermissions
+      case "QPMW" => LanguageFeature.QuantifiedMagicWands
+      case "QPP" => LanguageFeature.QuantifiedPredicates
+      case "QPF" => LanguageFeature.QuantifiedFields
     })
   }
 

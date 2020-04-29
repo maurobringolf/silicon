@@ -26,6 +26,8 @@ import viper.silicon.utils.Counter
 import viper.silver.ast.utility.rewriter.Traverse
 import viper.silver.cfg.silver.SilverCfg
 import viper.silver.reporter.{ConfigurationConfirmation, Reporter, VerificationResultMessage}
+import viper.silver.verifier
+import viper.silver.ast.utility.LanguageFeature
 
 /* TODO: Extract a suitable MasterVerifier interface, probably including
  *         - def verificationPoolManager: VerificationPoolManager)
@@ -153,10 +155,11 @@ class DefaultMasterVerifier(config: Config, override val reporter: Reporter)
     // Check language features support
     LanguageFeature.values.map(lf => {
       (program.methods ++ program.functions ++ program.predicates).map(mfp => {
-        if ( !config.supportsLanguageFeature(lf)
-           // TODO: This api has a weird order
-           && LanguageFeature.isUsedBy(program, lf)) {
-          return List(UnsupportedLanguageFeature())
+        if (!config.supportsLanguageFeature(lf)) {
+          lf.isUsedBy(program) match {
+            case Some(n) => return List(Failure(verifier.errors.Internal(verifier.reasons.FeatureUnsupported(verifier.DummyNode, lf.describe(n)))))
+            case None => {}
+          }
         }
       })
     })
