@@ -84,8 +84,8 @@ class PortableSiliconTests extends SilSuite with StatisticalTestSuite {
 
   lazy val verifier: Silicon = {
     val args =
-      commandLineArguments ++
-        Silicon.optionsFromScalaTestConfigMap(prefixSpecificConfigMap.getOrElse("silicon", Map()))
+      commandLineArguments // ++
+        //Silicon.optionsFromScalaTestConfigMap(prefixSpecificConfigMap.getOrElse("silicon", Map()))
     val reporter = NoopReporter
     val debugInfo = ("startedBy" -> "viper.silicon.SiliconTests") :: Nil
     val silicon = Silicon.fromPartialCommandLineArguments(args, reporter, debugInfo)

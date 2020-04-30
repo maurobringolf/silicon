@@ -55,14 +55,7 @@ class SiliconTests extends SilSuite {
     Seq("--timeout", "300" /* seconds */)
 
   private def createSiliconInstance() = {
-    val args =
-      commandLineArguments ++
-      Silicon.optionsFromScalaTestConfigMap(prefixSpecificConfigMap.getOrElse("silicon", Map()))
-    val reporter = NoopReporter
-    val debugInfo = ("startedBy" -> "viper.silicon.SiliconTests") :: Nil
-    val silicon = Silicon.fromPartialCommandLineArguments(args, reporter, debugInfo)
-
-    silicon
+    new Silicon()
   }
 }
 
