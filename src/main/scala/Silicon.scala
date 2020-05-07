@@ -116,27 +116,6 @@ class Silicon(val reporter: Reporter, private var debugInfo: Seq[(String, Any)] 
     _config = new Config(args)
   }
 
-  override def fromPartialCommandLineArguments(args: Seq[String]) {
-    parseCommandLine(args :+ dummyInputFilename)
-  }
-  val dummyInputFilename = "dummy-file-to-prevent-cli-parser-from-complaining-about-missing-file-name.silver"
-
-  override def optionsFromScalaTestConfigMap(configMap: collection.Map[String, Any]): Seq[String] =
-    configMap.flatMap {
-      case (k, v) =>
-        if (k.head.isUpper) {
-          Seq(s"-$k=$v")
-        } else {
-          val kStr = s"--$k"
-          val vStr = v.toString
-
-          vStr.toLowerCase match {
-            case "true" | "false" => Seq(kStr)
-            case _ => Seq(kStr, vStr)
-          }
-        }
-    }.toSeq
-
   def debugInfo(debugInfo: Seq[(String, Any)]) { this.debugInfo = debugInfo }
 
   /** Start Silicon.
