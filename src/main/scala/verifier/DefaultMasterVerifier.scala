@@ -156,10 +156,10 @@ class DefaultMasterVerifier(config: Config, override val reporter: Reporter)
     LanguageFeature.values.map(lf => {
       (program.methods ++ program.functions ++ program.predicates).map(mfp => {
         if (!config.supportsLanguageFeature(lf)) {
-          lf.isUsedBy(program) match {
-            case Some(n) => return List(Failure(verifier.errors.Internal(verifier.reasons.FeatureUnsupported(verifier.DummyNode, lf.describe(n)))))
-            case None => {}
-          }
+          val unsupportedNodes = lf.isUsedBy(program)
+          if (unsupportedNodes.nonEmpty) {
+            return List(Failure(verifier.errors.Internal(verifier.reasons.FeatureUnsupported(verifier.DummyNode, lf.describe(unsupportedNodes)))))
+          } 
         }
       })
     })
