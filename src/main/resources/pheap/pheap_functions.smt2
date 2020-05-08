@@ -17,10 +17,3 @@
 (assert (forall ((h PHeap)) (!
     (= h (PHeap.MWS (PHeap.LHS h) (PHeap.RHS h)))
     :pattern ((PHeap.MWS (PHeap.LHS h) (PHeap.RHS h))))))
-
-; TODO: (re)move this
-(declare-fun freshWildcard (Int) $Perm)
-
-(assert (forall ((i Int)) (!
-    (> (freshWildcard i) 0)
-    :pattern ((freshWildcard i)))))

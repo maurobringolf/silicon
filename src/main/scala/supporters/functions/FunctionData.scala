@@ -177,8 +177,13 @@ class FunctionData(val programFunction: ast.Function,
       val qSort = symbolConverter.toSort(forall.variables.head.typ)
 
       val proxyFa = ast.Forall(forall.variables, Seq(), ast.BoolLit(true)())()
+      
+      val notWildcardPerm: ast.Exp = perm match {
+        case _:ast.WildcardPerm => ast.FullPerm()()
+        case p => p
+      }
 
-      val Seq(tFa, tRcv, tCond, tPerm) = expressionTranslator.translatePrecondition(program, Seq(proxyFa, rcv, cond, perm), this)
+      val Seq(tFa, tRcv, tCond, tPerm) = expressionTranslator.translatePrecondition(program, Seq(proxyFa, rcv, cond, notWildcardPerm), this)
       val qi = tFa.asInstanceOf[Quantification].vars.head
 
       // TODO: Use better naming, probably just line number + column
@@ -221,7 +226,11 @@ class FunctionData(val programFunction: ast.Function,
     }
     case n@QuantifiedPermissionAssertion(forall, cond, ast.FieldAccessPredicate(ast.FieldAccess(rcv: ast.Exp, f: ast.Field), p: ast.Exp)) => {
       val (inv, invAx) = qpInversesMap(n.getPrettyMetadata._1)
-      val proxyFa = ast.Forall(forall.variables, Seq(), ast.And(cond, ast.GtCmp(p, ast.IntLit(0)())())())()
+      val notWildcardPerm: ast.Exp = p match {
+        case _:ast.WildcardPerm => ast.FullPerm()()
+        case p => p
+      }
+      val proxyFa = ast.Forall(forall.variables, Seq(), ast.And(cond, ast.GtCmp(notWildcardPerm, ast.IntLit(0)())())())()
       val Seq(tFa) = expressionTranslator.translatePrecondition(program, Seq(proxyFa), this)
       
       val i = tFa.asInstanceOf[Quantification].vars.head
