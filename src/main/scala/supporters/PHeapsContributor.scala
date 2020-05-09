@@ -94,7 +94,7 @@ class DefaultPHeapsContributor(preambleReader: PreambleReader[String, String],
       predicateSingletonPredicateDomains(program.predicates) ++
       fieldSingletonPredicateDomains(program.predicates, program. fields) ++
       fieldSingletonFieldDomains(program.fields)
-    astAxioms = extensional_equality(program.predicates, program.fields, program.functions)
+    astAxioms = framing_functions(program.predicates, program.fields, program.functions) ++ extensional_equality(program.predicates, program.fields, program.functions)
   }
 
   private def extractPreambleLines(from: Iterable[PreambleBlock]*): Iterable[String] =
@@ -178,44 +178,58 @@ class DefaultPHeapsContributor(preambleReader: PreambleReader[String, String],
                           ): Iterable[Term] = {
     val h1 = Var(Identifier("h1"), sorts.PHeap)
     val h2 = Var(Identifier("h2"), sorts.PHeap)
+
+    val equalOnPredicates = predicates.foldLeft[Term](True())((ax, p) => And(ax, equalOnPred(p, h1, h2)))
+    val equalOnFields = fields.foldLeft[Term](True())((ax, f) => And(ax, equalOnField(f, h1, h2)))
+
+    Seq(Forall( Seq(h1, h2)
+          , Implies(And(equalOnFields, equalOnPredicates), App(pHeap_equal, Seq(h1, h2)))
+          , Trigger(App(pHeap_equal, Seq(h1, h2)))))
+  }
+
+  private def equalOnField(f: ast.Field, h1: Term, h2: Term) : Term = {
     val r = Var(Identifier("r"), sorts.Ref)
-    val pHeap_equal = Fun(Identifier("PHeap.equal"), Seq(sorts.PHeap, sorts.PHeap), sorts.Bool)
+    val fSort = symbolConverter.toSort(f.typ)
+    And( SetEqual(PHeapFieldDomain(f.name, h1), PHeapFieldDomain(f.name, h2))
+        , Forall( Seq(r)
+                , Implies( SetIn(r, PHeapFieldDomain(f.name, h1))
+                        , PHeapLookupField(f.name, fSort, h1, r) === PHeapLookupField(f.name, fSort, h2, r))
+                , Seq( Trigger(Seq(PHeapLookupField(f.name, fSort, h1, r), PHeapLookupField(f.name, fSort, h2, r))))
+                )
+    )
+  }
 
-    def equalOnPred(p: ast.Predicate) : Term = {
-      val l = Var(Identifier("l"), sorts.Loc)
-      val lk1 = App(Fun(Identifier("PHeap.lookup_" ++ p.name), Seq(sorts.PHeap, sorts.Loc), sorts.PHeap), Seq(h1, l))
-      val lk2 = App(Fun(Identifier("PHeap.lookup_" ++ p.name), Seq(sorts.PHeap, sorts.Loc), sorts.PHeap), Seq(h2, l))
-      And( SetEqual(PHeapPredicateDomain(p.name, h1), PHeapPredicateDomain(p.name, h2))
-         , Forall( Seq(l)
-                 , Implies( SetIn(l, PHeapPredicateDomain(p.name, h1))
-                          , App(pHeap_equal, Seq(lk1, lk2)))
-                 , Seq(Trigger(Seq(lk1, lk2)))
-         )
-      )
-    }
+  private def equalOnPred(p: ast.Predicate, h1: Term, h2: Term) : Term = {
+    val l = Var(Identifier("l"), sorts.Loc)
+    val lk1 = App(Fun(Identifier("PHeap.lookup_" ++ p.name), Seq(sorts.PHeap, sorts.Loc), sorts.PHeap), Seq(h1, l))
+    val lk2 = App(Fun(Identifier("PHeap.lookup_" ++ p.name), Seq(sorts.PHeap, sorts.Loc), sorts.PHeap), Seq(h2, l))
+    And( SetEqual(PHeapPredicateDomain(p.name, h1), PHeapPredicateDomain(p.name, h2))
+        , Forall( Seq(l)
+                , Implies( SetIn(l, PHeapPredicateDomain(p.name, h1))
+                        , App(pHeap_equal, Seq(lk1, lk2)))
+                , Seq(Trigger(Seq(lk1, lk2))))
+    )
+  }
 
-    def equalOnField(f: ast.Field) : Term = {
-      val fSort = symbolConverter.toSort(f.typ)
-      And( SetEqual(PHeapFieldDomain(f.name, h1), PHeapFieldDomain(f.name, h2))
-         , Forall( Seq(r)
-                 , Implies( SetIn(r, PHeapFieldDomain(f.name, h1))
-                          , PHeapLookupField(f.name, fSort, h1, r) === PHeapLookupField(f.name, fSort, h2, r))
-                 , Seq( Trigger(Seq(PHeapLookupField(f.name, fSort, h1, r), PHeapLookupField(f.name, fSort, h2, r))))
-                 )
-      )
-    }
+  // TODO: Add meta term for this
+  private val pHeap_equal = Fun(Identifier("PHeap.equal"), Seq(sorts.PHeap, sorts.PHeap), sorts.Bool)
 
-    val equalOnPredicates = predicates.foldLeft[Term](True())((ax, p) => And(ax, equalOnPred(p)))
-    val equalOnFields = fields.foldLeft[Term](True())((ax, f) => And(ax, equalOnField(f)))
+  // TODO: Extend the meta syntax as needed to write this in SMT-LIB
+  def framing_functions( predicates: Seq[ast.Predicate]
+                          , fields: Seq[ast.Field]
+                          , functions: Seq[ast.Function]
+                          ): Iterable[Term] = {
+    val h1 = Var(Identifier("h1"), sorts.PHeap)
+    val h2 = Var(Identifier("h2"), sorts.PHeap)
     
-    functions.map(g => {
+    functions.filter(_.isAbstract).map(g => {
       // TODO: This contains a lot of duplication with the function supporter and relies on its internals.
       // Somehow make it reuse that code.
       val argSorts = g.formalArgs.map(x => symbolConverter.toSort(x.typ))
       val resultSort = symbolConverter.toSort(g.typ)
       val args = g.formalArgs.map(x => Var(Identifier(x.name), symbolConverter.toSort(x.typ)))
       val eqAx = Forall( Seq(h1, h2) ++ args
-                      , Implies(And(equalOnFields, equalOnPredicates), (App(HeapDepFun(Identifier(g.name ++ "%limited"), sorts.PHeap +: argSorts, resultSort), h1 +: args) === App(HeapDepFun(Identifier(g.name ++ "%limited"), sorts.PHeap +: argSorts, resultSort), h2 +: args)))
+                      , Implies(App(pHeap_equal, Seq(h1, h2)), (App(HeapDepFun(Identifier(g.name ++ "%limited"), sorts.PHeap +: argSorts, resultSort), h1 +: args) === App(HeapDepFun(Identifier(g.name ++ "%limited"), sorts.PHeap +: argSorts, resultSort), h2 +: args)))
                       , Seq(Trigger(Seq( App(HeapDepFun(Identifier(g.name ++ "%limited"), sorts.PHeap +: argSorts, resultSort), h1 +: args)
                                        , App(HeapDepFun(Identifier(g.name ++ "%limited"), sorts.PHeap +: argSorts, resultSort), h2 +: args)))))
       eqAx

@@ -140,13 +140,11 @@ class FunctionData(val programFunction: ast.Function,
         val x = Var(identifierFactory.fresh("loc"), sorts.Loc)
 
         Forall( arguments
-              , Forall( pArgs
-                      , Let(x, PHeapPredicateLoc(p.name, pArgs),
-                          And( Iff(SetIn(x, PHeapPredicateDomain(p.name, restrictHeapApplication)), dom(   PHeapPredicateLoc(p.name, pArgs)  ))
-                            , Implies(SetIn(x, PHeapPredicateDomain(p.name, restrictHeapApplication)), PHeapLookupPredicate(p.name, restrictHeapApplication, pArgs) === PHeapLookupPredicate(p.name, `?h`, pArgs))))
-                      , Seq( Trigger(SetIn(PHeapPredicateLoc(p.name, pArgs), PHeapPredicateDomain(p.name, restrictHeapApplication)))
-                          , Trigger(PHeapLookupPredicate(p.name, restrictHeapApplication, pArgs)))
-                      )
+              , Forall( Seq(x)
+                      , And( Iff(SetIn(x, PHeapPredicateDomain(p.name, restrictHeapApplication)), dom(x))
+                           , Implies(SetIn(x, PHeapPredicateDomain(p.name, restrictHeapApplication)), PHeapLookupPredicate(p.name, restrictHeapApplication, Seq(x)) === PHeapLookupPredicate(p.name, `?h`, Seq(x))))
+                      , Seq( Trigger(SetIn(x, PHeapPredicateDomain(p.name, restrictHeapApplication)))
+                          , Trigger(PHeapLookupPredicate(p.name, restrictHeapApplication, Seq(x)))))
               , Seq(Trigger(restrictHeapApplication))
               , s"restrictHeapAxiom_dom_${p.name}[${function.id.name}]")
       }}).foldLeft[Term](True())((d1,d2) => And(d1,d2))
@@ -280,9 +278,9 @@ class FunctionData(val programFunction: ast.Function,
                , lhsDom
                , (d1, d2) => And(d1, Not(d2)))
     case ast.FieldAccessPredicate(_, _) =>
-      toMap(program.predicates.zip(Seq.fill(program.fields.length){(_:Term) => False()}))
+      toMap(program.predicates.zip(Seq.fill(program.predicates.length){(_:Term) => False()}))
     case QuantifiedPermissionAssertion(_, _, ast.FieldAccessPredicate(_,_)) => 
-      toMap(program.predicates.zip(Seq.fill(program.fields.length){(_:Term) => False()}))
+      toMap(program.predicates.zip(Seq.fill(program.predicates.length){(_:Term) => False()}))
     case ast.CondExp(cond,e1,e2) =>
       val tCond = expressionTranslator.translatePrecondition(program, Seq(cond), this).head
       val e1Dom = getPredDoms(e1)
@@ -292,11 +290,11 @@ class FunctionData(val programFunction: ast.Function,
       val tCond = expressionTranslator.translatePrecondition(program, Seq(prem), this).head
       val concDom = getPredDoms(conc)
       mergeDoms( concDom
-               , toMap(program.predicates.zip(Seq.fill(program.fields.length){(_:Term) => False()}))
+               , toMap(program.predicates.zip(Seq.fill(program.predicates.length){(_:Term) => False()}))
                , Ite(tCond, _, _))
 
     case a => if (a.isPure)
-                toMap(program.predicates.zip(Seq.fill(program.fields.length){(_:Term) => False()}))
+                toMap(program.predicates.zip(Seq.fill(program.predicates.length){(_:Term) => False()}))
               else
                 sys.error("Cannot getPredDoms() of " + a.toString)
   }

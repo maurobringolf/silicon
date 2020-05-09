@@ -225,7 +225,12 @@ class TermToSMTLib2Converter
     case PHeapFieldDomain(f, h) => parens(text("PHeap.dom_") <> f <+> render(h))
     case PHeapLookupPredicate(p, h, args) => parens(text("PHeap.lookup_") <> p <+> render(h) <+> (
       if (args.length > 0) {
-        parens(text("PHeap.loc_") <> p <+> args.map(a => convert(a)).mkString(" "))
+        // TODO: Remove this hack
+        if (args.head.sort == sorts.Loc) {
+          render(args.head) 
+        } else {
+          parens(text("PHeap.loc_") <> p <+> args.map(a => convert(a)).mkString(" "))
+        }
       } else {
         text("PHeap.loc_") <> p
       }
