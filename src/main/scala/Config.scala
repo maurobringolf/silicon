@@ -336,7 +336,7 @@ class Config(args: Seq[String]) extends SilFrontendConfig(args, "Silicon") {
   )
 
   lazy val unsupportedLanguageFeatures : Seq[LanguageFeature.LanguageFeature] = {
-    rawUnsupportedLanguageFeatures().split(",").collect({
+    rawUnsupportedLanguageFeatures().split(",").map(_.trim).collect({
       case "MW" => LanguageFeature.MagicWands
       case "QP" => LanguageFeature.QuantifiedPermissions
       case "QPMW" => LanguageFeature.QuantifiedMagicWands

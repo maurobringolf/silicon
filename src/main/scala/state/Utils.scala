@@ -24,7 +24,7 @@ package object utils {
     }
 
     def replaceHeapDeps(t: Term, m: Map[Term, Var]) : Term = t match {
-      case App(f, args) => App(f, args.map(replaceHeapDeps(_,m)))
+      case App(f@HeapDepFun(_,_,_), args) => App(f, args.map(replaceHeapDeps(_,m)))
       case PHeapLookupField(f, s, h, at) => (m get t).get
       case PHeapSingletonPredicate(p, args, h) => (m get t).get
       case _ => t
