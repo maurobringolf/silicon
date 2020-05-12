@@ -331,7 +331,7 @@ class Config(args: Seq[String]) extends SilFrontendConfig(args, "Silicon") {
 
   private val rawUnsupportedLanguageFeatures: ScallopOption[String] = opt[String]("unsupportedLanguageFeatures",
     descr = "Reject programs that make use of certain language features (MW, QP, QPMW, QPP, QPF)",
-    default = Some("QPP, QPMW"),
+    default = Some(""),
     noshort = true
   )
 
