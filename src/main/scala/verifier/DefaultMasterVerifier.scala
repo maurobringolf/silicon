@@ -25,6 +25,7 @@ import viper.silicon.supporters.qps._
 import viper.silicon.utils.Counter
 import viper.silver.ast.utility.rewriter.Traverse
 import viper.silver.cfg.silver.SilverCfg
+import viper.silver.plugin.PluginAwareReporter
 import viper.silver.reporter.{ConfigurationConfirmation, Reporter, VerificationResultMessage}
 import viper.silver.verifier
 import viper.silver.ast.utility.LanguageFeature
@@ -39,7 +40,7 @@ trait MasterVerifier extends Verifier {
   def verificationPoolManager: VerificationPoolManager
 }
 
-class DefaultMasterVerifier(config: Config, override val reporter: Reporter)
+class DefaultMasterVerifier(config: Config, override val reporter: PluginAwareReporter)
     extends BaseVerifier(config, "00")
        with MasterVerifier
        with DefaultFunctionVerificationUnitProvider

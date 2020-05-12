@@ -18,14 +18,14 @@ import viper.silicon.state.terms.{AxiomRewriter, TriggerGenerator}
 import viper.silicon.supporters.{PredicateData, QuantifierSupporter}
 import viper.silicon.supporters.functions.FunctionData
 import viper.silicon.utils.Counter
+import viper.silver.plugin.PluginAwareReporter
 import viper.silver.ast.LabelledOld
-import viper.silver.reporter.Reporter
 
 trait Verifier {
   def uniqueId: String
 
   def logger: Logger
-  def reporter: Reporter
+  def reporter: PluginAwareReporter
   def counter(id: AnyRef): Counter
 
   def decider: Decider
@@ -53,7 +53,7 @@ object Verifier {
   def program: ast.Program = _program
   /*private*/ def program_=(program: ast.Program): Unit = { _program = program }
 
-  private var _inputFile: Option[Path] = _
+  private var _inputFile: Option[Path] = None
   def inputFile: Option[Path] = _inputFile
   /*private*/ def inputFile_=(file: Option[Path]): Unit = { _inputFile = file }
 
