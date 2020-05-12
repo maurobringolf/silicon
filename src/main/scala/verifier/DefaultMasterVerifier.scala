@@ -26,9 +26,9 @@ import viper.silicon.utils.Counter
 import viper.silver.ast.utility.rewriter.Traverse
 import viper.silver.cfg.silver.SilverCfg
 import viper.silver.plugin.PluginAwareReporter
-import viper.silver.reporter.{ConfigurationConfirmation, Reporter, VerificationResultMessage}
 import viper.silver.verifier
 import viper.silver.ast.utility.LanguageFeature
+import viper.silver.reporter.{ConfigurationConfirmation, VerificationResultMessage}
 
 /* TODO: Extract a suitable MasterVerifier interface, probably including
  *         - def verificationPoolManager: VerificationPoolManager)
@@ -164,12 +164,6 @@ class DefaultMasterVerifier(config: Config, override val reporter: PluginAwareRe
         }
       })
     })
-
-    /*if((program.methods ++ program.functions ++ program.predicates).map(x => {
-      val sCheck = createInitialState(x, program)
-      isSupported(sCheck)
-    }).exists(!_)) {
-    }*/
 
     predSnapGenerator.setup(program) // TODO: Why did Nadja put this here?
 
