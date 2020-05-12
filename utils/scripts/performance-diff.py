@@ -100,6 +100,9 @@ def makePlot(config):
 
             plt.savefig(f"{config.TMPDIR}/performance-diff.png", dpi=500)
 
+def createFileIfNotExists(fname):
+    f = open(fname, 'a+')
+    f.close()
 
 if __name__ == "__main__":
 
@@ -110,6 +113,9 @@ if __name__ == "__main__":
     config.BASECSV = config.BASE.replace("/", "_") + ".csv"
     config.CMPCSV = config.CMP.replace("/", "_") + ".csv"
     config.TMPDIR = 'tmp_csv'
+
+    createFileIfNotExists(f"{config.TMPDIR}/{config.BASECSV}")
+    createFileIfNotExists(f"{config.TMPDIR}/{config.CMPCSV}")
 
     if config.RUN:
         status = subprocess.run(f'git status --porcelain', shell=True,capture_output=True,text=True)
