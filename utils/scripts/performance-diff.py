@@ -19,7 +19,7 @@ parser.add_argument('--run', dest='RUN',action='store_true',
 
 
 def shouldIncludeTest(baseResults, compareResults):
-    return baseResults == compareResults
+    return baseResults[8] == compareResults[8] and float(baseResults[2]) > 0
 
 def checkoutAndRun(config):
     subprocess.run(f'git checkout {config.BASE}', shell=True)
@@ -42,7 +42,7 @@ def makePlot(config):
 
             # Filter out all tests with unequal verification results
             relevantTests = filter(
-                lambda x: shouldIncludeTest(x[0][8], x[1][8]),
+                lambda x: shouldIncludeTest(x[0], x[1]),
                 filter(
                     # Not a complete test row (can happen on failed Silver parsing)
                     lambda x: len(x[0]) >= 9 or len(x[1]) >= 9, zip(baseR, compareR)))
