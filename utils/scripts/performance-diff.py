@@ -1,11 +1,14 @@
 #!/usr/bin/env python3
 
 import csv
+import sys
 import subprocess
 import matplotlib.pyplot as plt
 import numpy as np
 from os.path import basename
 import argparse
+
+csv.field_size_limit(sys.maxsize)
 
 parser = argparse.ArgumentParser(description='Create a plot illustrating the performance difference between two Silicon commits (or branches, tags, etc).')
 parser.add_argument('--base', metavar='base', type=str, nargs=1, default='source/master', dest='BASE',
