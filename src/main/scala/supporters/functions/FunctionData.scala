@@ -92,8 +92,13 @@ class FunctionData(val programFunction: ast.Function,
   def translatePreconditionToDomain(pre: ast.Exp): Option[Term] = pre match {
     case ast.PredicateAccessPredicate(ast.PredicateAccess(args, pred), p) =>
       val tArgs = expressionTranslator.translatePrecondition(program, args, this)
-      val tp = expressionTranslator.translatePrecondition(program, Seq(p), this).head
-      Some(Ite( Greater(tp, NoPerm())
+      val tCond = p match {
+        case _: ast.WildcardPerm => True()
+        case _ =>
+          val tp = expressionTranslator.translatePrecondition(program, Seq(p), this).head
+          Greater(tp, NoPerm())
+      }
+      Some(Ite( tCond
               , PHeapSingletonPredicate(pred, tArgs, PHeapLookupPredicate(pred, `?h`, tArgs))
               , predef.Emp
       ))
@@ -102,9 +107,16 @@ class FunctionData(val programFunction: ast.Function,
       translatePreconditionToDomain(e2).map(d2 => PHeapCombine(d1, d2))
       })
     case ast.FieldAccessPredicate(ast.FieldAccess(x, f), p) =>
-      // TODO: Is this pattern matching always okay?
-      val Seq(tx, tp) = expressionTranslator.translatePrecondition(program, Seq(x, p), this)
-      Some(Ite( Greater(tp, NoPerm())
+      val tx = expressionTranslator.translatePrecondition(program, Seq(x), this).head
+
+      val tCond = p match {
+        case _: ast.WildcardPerm => True()
+        case _ =>
+          val tp = expressionTranslator.translatePrecondition(program, Seq(p), this).head
+          Greater(tp, NoPerm())
+      }
+
+      Some(Ite( tCond
               , PHeapSingletonField(f.name,tx, PHeapLookupField(f.name, symbolConverter.toSort(f.typ), `?h`, tx))
               , predef.Emp
       ))
