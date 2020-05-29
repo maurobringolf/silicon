@@ -221,8 +221,8 @@ class DefaultPHeapsContributor(preambleReader: PreambleReader[String, String],
                           ): Iterable[Term] = {
     val h1 = Var(Identifier("h1"), sorts.PHeap)
     val h2 = Var(Identifier("h2"), sorts.PHeap)
-    
-    functions.filter(_.isAbstract).map(g => {
+   
+    functions.map(g => {
       // TODO: This contains a lot of duplication with the function supporter and relies on its internals.
       // Somehow make it reuse that code.
       val argSorts = g.formalArgs.map(x => symbolConverter.toSort(x.typ))

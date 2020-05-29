@@ -90,16 +90,36 @@ class FunctionData(val programFunction: ast.Function,
   type DomMap[K] = Map[K, Term => Term]
 
   def translatePreconditionToDomain(pre: ast.Exp): Option[Term] = pre match {
-    case ast.PredicateAccessPredicate(ast.PredicateAccess(args, p), _) =>
+    case ast.PredicateAccessPredicate(ast.PredicateAccess(args, pred), p) =>
       val tArgs = expressionTranslator.translatePrecondition(program, args, this)
-      Some(PHeapSingletonPredicate(p, tArgs, PHeapLookupPredicate(p, `?h`, tArgs)))
+      val tCond = p match {
+        case _: ast.WildcardPerm => True()
+        case _ =>
+          val tp = expressionTranslator.translatePrecondition(program, Seq(p), this).head
+          Greater(tp, NoPerm())
+      }
+      Some(Ite( tCond
+              , PHeapSingletonPredicate(pred, tArgs, PHeapLookupPredicate(pred, `?h`, tArgs))
+              , predef.Emp
+      ))
     case ast.And(e1, e2) =>
     translatePreconditionToDomain(e1).flatMap(d1 => {
       translatePreconditionToDomain(e2).map(d2 => PHeapCombine(d1, d2))
       })
-    case ast.FieldAccessPredicate(ast.FieldAccess(x, f), _) =>
-      val tx = expressionTranslator.translatePrecondition(program, Seq(x), this)(0)
-      Some(PHeapSingletonField(f.name,tx, PHeapLookupField(f.name, symbolConverter.toSort(f.typ), `?h`, tx)))
+    case ast.FieldAccessPredicate(ast.FieldAccess(x, f), p) =>
+      val tx = expressionTranslator.translatePrecondition(program, Seq(x), this).head
+
+      val tCond = p match {
+        case _: ast.WildcardPerm => True()
+        case _ =>
+          val tp = expressionTranslator.translatePrecondition(program, Seq(p), this).head
+          Greater(tp, NoPerm())
+      }
+
+      Some(Ite( tCond
+              , PHeapSingletonField(f.name,tx, PHeapLookupField(f.name, symbolConverter.toSort(f.typ), `?h`, tx))
+              , predef.Emp
+      ))
     case ast.CondExp(iff, thn, els) =>
       val tIff = expressionTranslator.translatePrecondition(program, Seq(iff), this)(0)
       translatePreconditionToDomain(thn).flatMap(dthn => {
