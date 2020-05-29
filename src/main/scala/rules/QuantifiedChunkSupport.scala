@@ -1046,8 +1046,14 @@ object quantifiedChunkSupporter extends QuantifiedChunkSupport with Immutable {
         (result, s2, h2, Some(consumedChunk))
       })((s3, optCh, v2) =>
         optCh match {
+          // TODO: More unified handling of resources
           case Some(ch) =>
-            val snap = ResourceLookup(resource, ch.snapshotMap, arguments).convert(sorts.Snap)
+            val snap = resource match {
+              case f: ast.Field => {
+                PHeapSingletonField(f.name, arguments.head, ResourceLookup(resource, ch.snapshotMap, arguments))
+              }
+              case _ => sys.error("Quantified resource not implemented: " ++ resource.toString)
+            }
             Q(s3, s3.h, snap, v2)
           case _ =>
             Q(s3, s3.h, v2.decider.fresh(sorts.PHeap), v2)
@@ -1105,7 +1111,6 @@ object quantifiedChunkSupporter extends QuantifiedChunkSupport with Immutable {
                         chunkOrderHeuristic: Seq[QuantifiedBasicChunk] => Seq[QuantifiedBasicChunk],
                         v: Verifier)
                        : (ConsumptionResult, State, Seq[QuantifiedBasicChunk]) = {
-
     val requiredId = ChunkIdentifier(resource, Verifier.program)
     assert(
       relevantChunks forall (_.id == requiredId),
