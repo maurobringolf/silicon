@@ -204,8 +204,12 @@ class FunctionData(val programFunction: ast.Function,
       val Seq(tFa, tRcv, tCond, tPerm) = expressionTranslator.translatePrecondition(program, Seq(proxyFa, rcv, cond, notWildcardPerm), this)
       val qi = tFa.asInstanceOf[Quantification].vars.head
 
-      // TODO: Use better naming, probably just line number + column
-      val inv = Fun( Identifier("inv_" ++ node.getPrettyMetadata._1.toString)
+      // TODO: Ideally we would use source position in the name,
+      // such that the assocation is clear. But it seems that with macros
+      // the positions are not maintained? For example the testcase 'quantifiedpermissions/misc/heap_dependent_triggers.vpr'
+      // contains some edge cases.
+      val invName = "QPinv_" ++ this.function.id.toString ++ "_" ++ node.getPrettyMetadata._1.toString
+      val inv = Fun( Identifier(invName)
                    , sorts.Ref +: arguments.tail.map(_.sort)
                    , qSort)
 
