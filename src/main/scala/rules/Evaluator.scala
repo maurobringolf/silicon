@@ -1092,8 +1092,12 @@ object evaluator extends EvaluationRules with Immutable {
             */
           val cachedTrigger =
             s.possibleTriggers.get(fapp) map {
-              case app @ App(fun: HeapDepFun, _) =>
-                app.copy(applicable = functionSupporter.limitedVersion(fun))
+              case app @ App(fun: HeapDepFun, h +: args) =>
+                h match {
+                  case PHeapRestrict(_,h,_) => App(functionSupporter.limitedVersion(fun), h +: args)
+                  case _ => app.copy(applicable = functionSupporter.limitedVersion(fun))
+
+                }
               case app: App =>
                 app
               case other =>

@@ -82,8 +82,12 @@ trait ExpressionTranslator {
         /** IMPORTANT: Keep in sync with [[viper.silicon.rules.evaluator.evalTrigger]] */
         val translatedTriggers = eTriggers map (triggerSet => Trigger(triggerSet.exps map (trigger =>
           f(trigger) match {
-            case app @ App(fun: HeapDepFun, _) =>
-              app.copy(applicable = functionSupporter.limitedVersion(fun))
+            case app @ App(fun: HeapDepFun, h +: args) =>
+              h match {
+                case PHeapRestrict(_,h,_) => App(functionSupporter.limitedVersion(fun), h +: args)
+                case _ => app.copy(applicable = functionSupporter.limitedVersion(fun))
+
+              }
             case other => other
           }
         )))
