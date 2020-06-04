@@ -14,20 +14,19 @@ package object utils {
 
   // Applies a simple search-and-replace strategy to project heap dependencies of a trigger to quantified variables
   // Splits the quantifier per trigger
-  def projectHeapDeps(q : Quantification, v: Verifier) : Seq[Quantification] = {
+  def projectHeapDeps(q : Quantification, fresh: (String, Sort) => Var) : Seq[Quantification] = {
     
     def computeHeapDeps(t: Term) : Seq[Term] = t match {
       case App(HeapDepFun(_,_,_), args) => args.flatMap(computeHeapDeps)
       case PHeapLookupField(f, s, h, at) => Seq(t)
-      case PHeapSingletonPredicate(p, args, h) => Seq(t)
+      case _ if t.sort == sorts.PHeap => Seq(t)
       case _ => Seq()
     }
 
     def replaceHeapDeps(t: Term, m: Map[Term, Var]) : Term = t match {
       case App(f@HeapDepFun(_,_,_), args) => App(f, args.map(replaceHeapDeps(_,m)))
       case PHeapLookupField(f, s, h, at) => (m get t).get
-      case PHeapSingletonPredicate(p, args, h) => (m get t).get
-      case _ => t
+      case _ => m.getOrElse(t, t)
     }
 
     // TODO: Keep all heap-independent triggers under one quantifier instead of splitting
@@ -38,7 +37,7 @@ package object utils {
       .distinct
       // : Seq[(Trigger, Seq[Term])]
       // Map all heap dependencies to fresh variables
-      .map({ case (ts, deps) => (ts, deps.map(t => (t, v.decider.fresh("proj", t.sort))).toMap)})
+      .map({ case (ts, deps) => (ts, deps.map(t => (t, fresh("proj", t.sort))).toMap)})
       // : Seq[(Trigger, Map[Term, Var])]
       // For each trigger, create a new quantifier where all heap dependencies are replaced with the new variables
       .map({ case (ts, m) => Quantification(q.q,

@@ -13,6 +13,7 @@ import viper.silicon.rules.functionSupporter
 import viper.silicon.state.{Identifier, SimpleIdentifier, SuffixedIdentifier, SymbolConverter}
 import viper.silicon.state.terms._
 import viper.silicon.state.terms.predef.`?h`
+import viper.silicon.state.utils.projectHeapDeps
 import viper.silicon.supporters.ExpressionTranslator
 import viper.silver.plugin.PluginAwareReporter
 import viper.silver.reporter.InternalWarningMessage
@@ -30,6 +31,7 @@ class HeapAccessReplacingExpressionTranslator(symbolConverter: SymbolConverter,
   private var data: FunctionData = _
   private var ignoreAccessPredicates = false
   private var failed = false
+  private var shouldProjectHeapDeps = false
   private var snap: Term = `?h`
 
   var functionData: Map[ast.Function, FunctionData] = _
@@ -66,6 +68,7 @@ class HeapAccessReplacingExpressionTranslator(symbolConverter: SymbolConverter,
     this.data = data
     this.failed = false
     this.snap = `?h`
+    this.shouldProjectHeapDeps = true
 
     posts.map(p => translate(symbolConverter.toSort _)(p.whenInhaling))
   }
@@ -80,6 +83,7 @@ class HeapAccessReplacingExpressionTranslator(symbolConverter: SymbolConverter,
     this.ignoreAccessPredicates = true
     this.failed = false
     this.snap = `?h`
+    this.shouldProjectHeapDeps = false
 
     pres.map(p => translate(symbolConverter.toSort _)(p.whenExhaling))
   }
@@ -117,15 +121,24 @@ class HeapAccessReplacingExpressionTranslator(symbolConverter: SymbolConverter,
          * 'x' is bound by the surrounding quantifier.
          */
         val tQuant = super.translate(symbolConverter.toSort)(eQuant).asInstanceOf[Quantification]
+
         val names = tQuant.vars.map(_.id.name)
 
-        tQuant.transform({ case v: Var =>
+        val renamedtQuant = tQuant.transform({ case v: Var =>
           v.id match {
             case sid: SuffixedIdentifier if names.contains(sid.prefix) => Var(SimpleIdentifier(sid.prefix), v.sort)
             case _ => v
           }
           case x => x
         })()
+
+        // TODO: Not sure what the interaction with the above renaming transformation is,
+        // maybe they need to happen in opposite order or be intertwined in some way
+        if (this.shouldProjectHeapDeps) {
+          projectHeapDeps(renamedtQuant, fresh).foldLeft[Term](True())((x,y) => And(x,y))
+        } else {
+          renamedtQuant
+        }
 
       case ast.FieldAccess(rcv, field) =>
         PHeapLookupField(field.name, symbolConverter.toSort(field.typ), this.snap, translate(rcv))

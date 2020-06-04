@@ -597,7 +597,7 @@ object evaluator extends EvaluationRules with Immutable {
         evalQuantified(s, qantOp, eQuant.variables, Nil, Seq(body), Some(eTriggers), name, pve, v){
           case (s1, tVars, _, Seq(tBody), tTriggers, (tAuxGlobal, tAux), v1) =>
 
-            val tAuxProj = tAux.flatMap(projectHeapDeps(_:Quantification, v1))
+            val tAuxProj = tAux.flatMap(projectHeapDeps(_:Quantification, v1.decider.fresh))
 
             val tlqGlobal = tAuxGlobal flatMap (q1 => q1.deepCollect {case q2: Quantification if !q2.existsDefined {case v: Var if q1.vars.contains(v) => } => q2})
             val tlq = tAux flatMap (q1 => q1.deepCollect {case q2: Quantification if !q2.existsDefined {case v: Var if q1.vars.contains(v) => } => q2})
