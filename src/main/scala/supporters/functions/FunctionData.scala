@@ -210,21 +210,21 @@ class FunctionData(val programFunction: ast.Function,
       // contains some edge cases.
       val invName = "QPinv_" ++ this.function.id.toString ++ "_" ++ node.getPrettyMetadata._1.toString
       val inv = Fun( Identifier(invName)
-                   , sorts.Ref +: arguments.tail.map(_.sort)
+                   , sorts.Ref +: arguments.map(_.sort)
                    , qSort)
 
-      val leftInverse = Forall( qi +: arguments.tail
-                              , Implies(And(tCond, Greater(tPerm, Zero)), (App(inv, tRcv +: arguments.tail) === qi))
-                              , Seq(Trigger(App(inv, tRcv +: arguments.tail)))
+      val leftInverse = Forall( qi +: arguments
+                              , Implies(And(tCond, Greater(tPerm, Zero)), (App(inv, tRcv +: arguments) === qi))
+                              , Seq(Trigger(App(inv, tRcv +: arguments)))
                               , "leftInverse")
       
       val r = Var(identifierFactory.fresh("r"), sorts.Ref)
-      val tCondr = tCond.replace(qi, App(inv,r +: arguments.tail))
-      val tPermr = tPerm.replace(qi, App(inv,r +: arguments.tail))
-      val tRcvr = tRcv.replace(qi, App(inv,r +: arguments.tail))
-      val rightInverse = Forall( r +: arguments.tail
+      val tCondr = tCond.replace(qi, App(inv,r +: arguments))
+      val tPermr = tPerm.replace(qi, App(inv,r +: arguments))
+      val tRcvr = tRcv.replace(qi, App(inv,r +: arguments))
+      val rightInverse = Forall( r +: arguments
                               , Implies(And(tCondr, Greater(tPermr, Zero)), tRcvr === r)
-                              , Seq(Trigger(App(inv,r +: arguments.tail)))
+                              , Seq(Trigger(App(inv,r +: arguments)))
                               , "rightInverse")
 
       Map(node.getPrettyMetadata._1 -> (inv, Seq(leftInverse, rightInverse)))
@@ -256,7 +256,7 @@ class FunctionData(val programFunction: ast.Function,
       val Seq(tFa) = expressionTranslator.translatePrecondition(program, Seq(proxyFa), this)
       
       val i = tFa.asInstanceOf[Quantification].vars.head
-      Map(f -> (r => tFa.asInstanceOf[Quantification].body.replace(i, App(inv, r +: arguments.tail))))
+      Map(f -> (r => tFa.asInstanceOf[Quantification].body.replace(i, App(inv, r +: arguments))))
     }
     case ast.PredicateAccessPredicate(_, _) =>
       toMap(program.fields.zip(Seq.fill(program.fields.length){(_:Term) => False()}))

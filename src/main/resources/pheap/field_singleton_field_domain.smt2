@@ -7,3 +7,11 @@
 	(not (Set_in x (PHeap.dom_$FLD2$ ($FVF.toPHeap_$FLD$ fvf))))
     :pattern ((Set_in x (PHeap.dom_$FLD2$ ($FVF.toPHeap_$FLD$ fvf))))
     )))
+
+(assert (forall ((fvf $FVF<$S$>)) (!
+    (=
+        (PHeap.dom_$FLD2$ ($FVF.toPHeap_$FLD$ fvf))
+		(as Set_empty Set<$Ref>)
+    )
+    :pattern ((PHeap.dom_$FLD2$ ($FVF.toPHeap_$FLD$ fvf)))
+    )))
