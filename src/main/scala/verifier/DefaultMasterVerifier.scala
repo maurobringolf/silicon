@@ -60,8 +60,7 @@ class DefaultMasterVerifier(config: Config, override val reporter: PluginAwareRe
   protected val fieldValueFunctionsContributor = new DefaultFieldValueFunctionsContributor(preambleReader, symbolConverter, termConverter, config)
   protected val pheapsContributor = new DefaultPHeapsContributor(preambleReader, symbolConverter, termConverter, config)
   protected val predSnapGenerator = new PredicateSnapGenerator(symbolConverter)
-  protected val predicateSnapFunctionsContributor = new DefaultPredicateSnapFunctionsContributor(preambleReader, symbolConverter, termConverter, predSnapGenerator, config)
-  protected val magicWandSnapFunctionsContributor = new DefaultMagicWandSnapFunctionsContributor(preambleReader, termConverter)
+  protected val predicateAndWandSnapFunctionsContributor = new DefaultPredicateAndWandSnapFunctionsContributor(preambleReader, termConverter, predSnapGenerator, config)
 
   private val _verificationPoolManager: VerificationPoolManager = new VerificationPoolManager(this)
   def verificationPoolManager: VerificationPoolManager = _verificationPoolManager
@@ -71,7 +70,7 @@ class DefaultMasterVerifier(config: Config, override val reporter: PluginAwareRe
     sequencesContributor, setsContributor, multisetsContributor, domainsContributor,
     fieldValueFunctionsContributor,
     pheapsContributor,
-    predSnapGenerator, predicateSnapFunctionsContributor, magicWandSnapFunctionsContributor,
+    predSnapGenerator, predicateAndWandSnapFunctionsContributor,
     functionsSupporter, predicateSupporter,
     _verificationPoolManager,
     MultiRunRecorders /* In lieu of a better place, include MultiRunRecorders singleton here */
@@ -279,7 +278,7 @@ class DefaultMasterVerifier(config: Config, override val reporter: PluginAwareRe
           applyHeuristics = applyHeuristics,
           predicateSnapMap = predSnapGenerator.snapMap,
           predicateFormalVarMap = predSnapGenerator.formalVarMap,
-          isMethodVerification = member.isInstanceOf[ast.Method])
+          isMethodVerification = member.isInstanceOf[ast.Member])
   }
 
   private def createInitialState(cfg: SilverCfg, program: ast.Program): State = {
@@ -338,8 +337,7 @@ class DefaultMasterVerifier(config: Config, override val reporter: PluginAwareRe
     multisetsContributor,
     domainsContributor,
     fieldValueFunctionsContributor,
-    predicateSnapFunctionsContributor,
-    magicWandSnapFunctionsContributor,
+    predicateAndWandSnapFunctionsContributor,
     functionsSupporter,
     predicateSupporter,
     pheapsContributor
@@ -351,8 +349,7 @@ class DefaultMasterVerifier(config: Config, override val reporter: PluginAwareRe
     multisetsContributor,
     domainsContributor,
     fieldValueFunctionsContributor,
-    predicateSnapFunctionsContributor,
-    magicWandSnapFunctionsContributor,
+    predicateAndWandSnapFunctionsContributor,
     functionsSupporter,
     predicateSupporter,
     pheapsContributor
@@ -364,8 +361,7 @@ class DefaultMasterVerifier(config: Config, override val reporter: PluginAwareRe
     multisetsContributor,
     domainsContributor,
     fieldValueFunctionsContributor,
-    predicateSnapFunctionsContributor,
-    magicWandSnapFunctionsContributor,
+    predicateAndWandSnapFunctionsContributor,
     functionsSupporter,
     predicateSupporter,
     pheapsContributor
@@ -381,8 +377,7 @@ class DefaultMasterVerifier(config: Config, override val reporter: PluginAwareRe
     sequencesContributor,
     domainsContributor,
     fieldValueFunctionsContributor,
-    predicateSnapFunctionsContributor,
-    magicWandSnapFunctionsContributor,
+    predicateAndWandSnapFunctionsContributor,
     functionsSupporter,
     predicateSupporter,
     pheapsContributor
@@ -394,8 +389,7 @@ class DefaultMasterVerifier(config: Config, override val reporter: PluginAwareRe
     multisetsContributor,
     domainsContributor,
     fieldValueFunctionsContributor,
-    predicateSnapFunctionsContributor,
-    magicWandSnapFunctionsContributor,
+    predicateAndWandSnapFunctionsContributor,
     functionsSupporter,
     predicateSupporter,
     pheapsContributor

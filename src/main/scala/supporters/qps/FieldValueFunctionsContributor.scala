@@ -59,6 +59,8 @@ class DefaultFieldValueFunctionsContributor(preambleReader: PreambleReader[Strin
     }*/
     collectedFields = InsertionOrderedSet(program.fields)
 
+    // WARNING: DefaultSetsContributor contributes a sort that is due to QPs over fields
+
     collectedSorts = (
         collectedFields.map(f => sorts.FieldValueFunction(symbolConverter.toSort(f.typ)))
       + sorts.FieldValueFunction(sorts.Ref))

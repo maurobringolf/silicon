@@ -33,6 +33,12 @@ class DefaultSetsContributor(val domainTranslator: DomainsTranslator[Term], conf
     setTypeInstances += ast.SetType(ast.Ref)
     setTypeInstances += ast.SetType((new ast.DomainType("Loc", Map.empty[ast.TypeVar, ast.Type])(Seq())))
 
+    /* $PSF.domain_p is of type Set[Snap], and a corresponding instantiation of the set axioms
+      * is thus needed. Currently, such an instantiation is supported only for Viper types.
+      * Hence, we use an embedding of Silicon's sorts.Snap into Viper's type system, via a Viper
+      * extension type. */
+    setTypeInstances += ast.SetType(viper.silicon.utils.ast.ViperEmbedding(sorts.Snap))
+
     setTypeInstances
   }
 
@@ -41,4 +47,3 @@ class DefaultSetsContributor(val domainTranslator: DomainsTranslator[Term], conf
     sorts.Set(argumentSorts.head)
   }
 }
-

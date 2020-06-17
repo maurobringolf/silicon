@@ -121,7 +121,7 @@ object chunkSupporter extends ChunkSupportRules with Immutable {
             case _ if v1.decider.checkSmoke() =>
               Success() // TODO: Mark branch as dead?
             case _ =>
-              Failure(ve).withLoad(args)
+              createFailure(ve, v1, s1, true).withLoad(args)
           }
         }
       )(Q)
@@ -217,7 +217,7 @@ object chunkSupporter extends ChunkSupportRules with Immutable {
       case _ if v.decider.checkSmoke() =>
         Success() // TODO: Mark branch as dead?
       case _ =>
-        Failure(ve).withLoad(args)
+        createFailure(ve, v, s, true).withLoad(args)
     }
   }
 

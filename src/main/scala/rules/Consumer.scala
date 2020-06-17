@@ -419,7 +419,7 @@ object consumer extends ConsumptionRules with Immutable {
                       Q(s4, h1, hsnap, v3)
               })
               case false =>
-                Failure(pve dueTo NegativePermission(perm))}))
+                createFailure(pve dueTo NegativePermission(perm), v2, s2)}))
 
       case _: ast.InhaleExhaleExp =>
         Failure(viper.silicon.utils.consistency.createUnexpectedInhaleExhaleExpressionError(a))
@@ -494,7 +494,7 @@ object consumer extends ConsumptionRules with Immutable {
             v2.decider.assume(t)
             QS(s3, v2)
           case false =>
-            Failure(pve dueTo AssertionFalse(e))}})
+            createFailure(pve dueTo AssertionFalse(e), v2, s3)}})
     })((s4, v4) => {
       val s5 = s4.copy(h = s.h,
                        reserveHeaps = s.reserveHeaps,
