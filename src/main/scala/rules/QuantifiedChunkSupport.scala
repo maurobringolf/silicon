@@ -1554,6 +1554,7 @@ object quantifiedChunkSupporter extends QuantifiedChunkSupport with Immutable {
             .zip(codomainQVars)
             .map { case (fctOfInvs, r) => fctOfInvs === r }))
 
+
     val axFctsOfInvsTriggers: Seq[Trigger] =
       if (Verifier.config.disableISCTriggers()) Nil else inversesOfCodomains.map(Trigger.apply)
 

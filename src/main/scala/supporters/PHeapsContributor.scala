@@ -188,13 +188,19 @@ class DefaultPHeapsContributor(preambleReader: PreambleReader[String, String],
   }
 
   def predicate_loc_inv_func_axioms(predicates: Seq[ast.Predicate]): Iterable[Term] = {
-    predicates.flatMap(p => p.formalArgs.zipWithIndex.map({ case (a,i) =>
+    predicates.flatMap(p => p.formalArgs.zipWithIndex.flatMap({ case (a,i) =>
       val a_sort = symbolConverter.toSort(a.typ)
       val pArgs = p.formalArgs.map(a => Var(Identifier(a.name), symbolConverter.toSort(a.typ)))
-      Forall( pArgs
-            , PHeapPredicateLocInv(p.name, i, a_sort, PHeapPredicateLoc(p.name, pArgs)) === pArgs(i)
-            , Seq(Trigger(PHeapPredicateLocInv(p.name, i, a_sort, PHeapPredicateLoc(p.name, pArgs))))
-            )
+      val inv1 = Forall( pArgs
+                       , PHeapPredicateLocInv(p.name, i, a_sort, PHeapPredicateLoc(p.name, pArgs)) === pArgs(i)
+                       , Seq(Trigger(PHeapPredicateLocInv(p.name, i, a_sort, PHeapPredicateLoc(p.name, pArgs))))
+                       )
+      val l = Var(Identifier("l"), sorts.Loc)
+      val inv2 = Forall( l
+                       , PHeapPredicateLoc(p.name, pArgs.zipWithIndex.map({ case (a,i) => PHeapPredicateLocInv(p.name, i, a.sort, l)})) === l
+                       , Seq(Trigger(PHeapPredicateLoc(p.name, pArgs.zipWithIndex.map({ case (a,i) => PHeapPredicateLocInv(p.name, i, a.sort, l)}))))
+                       )
+      Seq(inv1, inv2)
     }))
   }
 

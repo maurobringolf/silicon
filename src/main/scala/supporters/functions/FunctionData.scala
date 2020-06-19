@@ -196,6 +196,7 @@ class FunctionData(val programFunction: ast.Function,
     case ast.CondExp(cond,e1,e2) => getQPInversesMap(e1) ++ getQPInversesMap(e2)
     case ast.Implies(prem, conc) => getQPInversesMap(conc)
     case node@QuantifiedPermissionAssertion(forall,cond,ast.FieldAccessPredicate(ast.FieldAccess(rcv: ast.Exp, f: ast.Field), perm: ast.Exp)) => {
+      // TODO: Why do we only look at one variable? Multiple are allowed too?
       val qSort = symbolConverter.toSort(forall.variables.head.typ)
 
       val proxyFa = ast.Forall(forall.variables, Seq(), ast.BoolLit(true)())()
@@ -233,6 +234,51 @@ class FunctionData(val programFunction: ast.Function,
 
       Map(node.getPrettyMetadata._1 -> (inv, Seq(leftInverse, rightInverse)))
     }
+
+    case node@QuantifiedPermissionAssertion(forall,cond,ast.PredicateAccessPredicate(ast.PredicateAccess(args, pred), perm: ast.Exp)) => {
+      // TODO: Why do we only look at one variable? Multiple are allowed too?
+      val qSort = symbolConverter.toSort(forall.variables.head.typ)
+
+      val proxyFa = ast.Forall(forall.variables, Seq(), ast.BoolLit(true)())()
+      
+      val notWildcardPerm: ast.Exp = perm match {
+        case _:ast.WildcardPerm => ast.FullPerm()()
+        case p => p
+      }
+
+      val Seq(tFa, tCond, tPerm) = expressionTranslator.translatePrecondition(program, Seq(proxyFa, cond, notWildcardPerm), this)
+      val tArgs = expressionTranslator.translatePrecondition(program, args, this)
+      val qi = tFa.asInstanceOf[Quantification].vars.head
+
+      // TODO: Ideally we would use source position in the name,
+      // such that the assocation is clear. But it seems that with macros
+      // the positions are not maintained? For example the testcase 'quantifiedpermissions/misc/heap_dependent_triggers.vpr'
+      // contains some edge cases.
+      val invName = "QPinv_" ++ this.function.id.toString ++ "_" ++ node.getPrettyMetadata._1.toString
+
+
+      val inv = Fun( Identifier(invName)
+                   // TODO: Would be clearer if predicate arg sorts were taken from predicate instead of tArgs
+                   , tArgs.map(_.sort) ++ arguments.map(_.sort)
+                   , qSort)
+
+      val leftInverse = Forall( qi +: arguments
+                              , Implies(And(tCond, Greater(tPerm, Zero)), (App(inv, tArgs ++ arguments) === qi))
+                              , Seq(Trigger(App(inv, tArgs ++ arguments)))
+                              , "leftInverse")
+
+      val rs = tArgs.map(x => Var(identifierFactory.fresh("r"), x.sort))
+      val tCondr = tCond.replace(qi, App(inv,rs ++ arguments))
+      val tPermr = tPerm.replace(qi, App(inv,rs ++ arguments))
+      val tRcvr = tArgs.map(_.replace(qi, App(inv,rs ++ arguments)))
+      val rightInverse = Forall( rs ++ arguments
+                              , Implies(And(tCondr, Greater(tPermr, Zero)), And(tRcvr.zip(rs).map({ case (x,y) => x === y})))
+                              , Seq(Trigger(App(inv,rs ++ arguments)))
+                              , "rightInverse")
+
+      Map(node.getPrettyMetadata._1 -> (inv, Seq(leftInverse, rightInverse)))
+    }
+
     case _ => Map.empty
   }
 
@@ -262,6 +308,8 @@ class FunctionData(val programFunction: ast.Function,
       val i = tFa.asInstanceOf[Quantification].vars.head
       Map(f -> (r => tFa.asInstanceOf[Quantification].body.replace(i, App(inv, r +: arguments))))
     }
+    case n@QuantifiedPermissionAssertion(forall, cond, _: ast.PredicateAccessPredicate) =>
+      toMap(program.fields.zip(Seq.fill(program.fields.length){(_:Term) => False()}))
     case ast.PredicateAccessPredicate(_, _) =>
       toMap(program.fields.zip(Seq.fill(program.fields.length){(_:Term) => False()}))
     case ast.CondExp(cond,e1,e2) =>
@@ -309,6 +357,20 @@ class FunctionData(val programFunction: ast.Function,
       toMap(program.predicates.zip(Seq.fill(program.predicates.length){(_:Term) => False()}))
     case QuantifiedPermissionAssertion(_, _, ast.FieldAccessPredicate(_,_)) => 
       toMap(program.predicates.zip(Seq.fill(program.predicates.length){(_:Term) => False()}))
+
+    case n@QuantifiedPermissionAssertion(forall, cond, ast.PredicateAccessPredicate(ast.PredicateAccess(args, pred), p: ast.Exp)) => {
+      val (inv, invAx) = qpInversesMap(n.getPrettyMetadata._1)
+      val notWildcardPerm: ast.Exp = p match {
+        case _:ast.WildcardPerm => ast.FullPerm()()
+        case p => p
+      }
+      val proxyFa = ast.Forall(forall.variables, Seq(), ast.And(cond, ast.GtCmp(notWildcardPerm, ast.IntLit(0)())())())()
+      val Seq(tFa) = expressionTranslator.translatePrecondition(program, Seq(proxyFa), this)
+     
+      val i = tFa.asInstanceOf[Quantification].vars.head
+      Map(program.findPredicate(pred) -> ((l: Term) => tFa.asInstanceOf[Quantification].body.replace(i, App(inv, args.zipWithIndex.map({ case (a,i) => PHeapPredicateLocInv(pred, i, symbolConverter.toSort(a.typ), l)}) ++ arguments))))
+    }
+
     case ast.CondExp(cond,e1,e2) =>
       val tCond = expressionTranslator.translatePrecondition(program, Seq(cond), this).head
       val e1Dom = getPredDoms(e1)
