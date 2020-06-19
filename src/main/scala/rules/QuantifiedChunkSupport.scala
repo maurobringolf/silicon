@@ -843,15 +843,15 @@ object quantifiedChunkSupporter extends QuantifiedChunkSupport with Immutable {
           bodyVars.indices.toList.map(i => Var(Identifier(s"x$i"), v.symbolConverter.toSort(bodyVars(i).typ)))
       }
     val h1 = s.h + ch
+    val qvarsToInv = inv.qvarsToInversesOf(codomainVars)
+    val condOfInv = tCond.replace(qvarsToInv)
     val (relevantChunks, _) =
       quantifiedChunkSupporter.splitHeap[QuantifiedBasicChunk](h1, ch.id)
     val (smDef1, smCache1) =
       quantifiedChunkSupporter.summarisingSnapshotMap(
-        s, resource, codomainVars, relevantChunks, v)
-    //val trigger = ResourceTriggerFunction(resource, smDef1.sm, codomainVars)
-    val qvarsToInv = inv.qvarsToInversesOf(codomainVars)
-    val condOfInv = tCond.replace(qvarsToInv)
-    //v.decider.assume(Forall(codomainVars, Implies(condOfInv, trigger), Trigger(inv.inversesOf(codomainVars)))) //effectiveTriggers map (t => Trigger(t.p map (_.replace(qvarsToInv))))))
+        s, resource, codomainVars, relevantChunks, v, Some(condOfInv))
+    val trigger = ResourceTriggerFunction(resource, smDef1.sm, codomainVars)
+    v.decider.assume(Forall(codomainVars, Implies(condOfInv, trigger), Trigger(inv.inversesOf(codomainVars)))) //effectiveTriggers map (t => Trigger(t.p map (_.replace(qvarsToInv))))))
 
     v.decider.assume(tSnap === smDef1.sm)
     val s1 =
