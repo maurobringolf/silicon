@@ -1774,6 +1774,15 @@ object PHeapPredicateLoc extends ((String, Seq[Term]) => Term) {
   def unapply(pl: PHeapPredicateLoc) = Some((pl.predicate, pl.args))
 }
 
+class PHeapPredicateLocInv(val predicate: String, val idx: Int, val sort: Sort, val loc: Term) extends Term
+
+object PHeapPredicateLocInv extends ((String, Int, Sort, Term) => Term) {
+  // TODO: Syntactic optimization
+  def apply(predicate: String, idx: Int, sort: Sort, loc: Term) = new PHeapPredicateLocInv(predicate,idx,sort,loc)
+
+  def unapply(pli: PHeapPredicateLocInv) = Some((pli.predicate, pli.idx, pli.sort, pli.loc))
+}
+
 class PHeapLookupPredicate(val predicate: String, val h: Term, val args: Seq[Term]) extends PHeapTerm
 
 object PHeapLookupPredicate extends ((String, Term, Seq[Term]) => Term) {
@@ -1855,8 +1864,7 @@ case class PredicateDomain(predname: String, psf: Term) extends SetTerm /*with P
 }
 
 case class PredicateTrigger(predname: String, psf: Term, args: Seq[Term]) extends Term {
-  utils.assertSort(psf, "predicate snap function", "PredicateSnapFunction", _.isInstanceOf[sorts.PredicateSnapFunction])
-
+  utils.assertSort(psf, "predicate snap function", "PredicateSnapFunction", _ == sorts.PHeap)
   val sort = sorts.Bool
 }
 
@@ -1954,13 +1962,11 @@ object ResourceLookup {
   def apply(field: ast.Field, sm: Term, rcvr: Term): Lookup =
     Lookup(field.name, sm, rcvr)
 
-  def apply(predicate: ast.Predicate, sm: Term, args: Seq[Term]): PredicateLookup =
-    PredicateLookup(predicate.name, sm, args)
+  def apply(predicate: ast.Predicate, sm: Term, args: Seq[Term]): Term =
+    PHeapLookupPredicate(predicate.name, sm, args)
 
   def apply(wand: ast.MagicWand, sm: Term, args: Seq[Term]): PredicateLookup = {
-    val wandId = MagicWandIdentifier(wand, Verifier.program).toString
-
-    PredicateLookup(wandId, sm, args)
+    sys.error("QPMW not implemented.")
   }
 }
 

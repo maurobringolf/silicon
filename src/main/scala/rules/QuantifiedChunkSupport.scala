@@ -10,7 +10,7 @@ import scala.reflect.ClassTag
 import viper.silver.ast
 import viper.silver.verifier.{ErrorReason, PartialVerificationError}
 import viper.silver.verifier.reasons.{InsufficientPermission, MagicWandChunkNotFound}
-import viper.silicon.{Map, SymbExLogger}
+import viper.silicon.{toMap, Map, SymbExLogger}
 import viper.silicon.interfaces.state._
 import viper.silicon.interfaces.{Failure, VerificationResult}
 import viper.silicon.resources.{NonQuantifiedPropertyInterpreter, QuantifiedPropertyInterpreter, Resources}
@@ -443,7 +443,7 @@ object quantifiedChunkSupporter extends QuantifiedChunkSupport with Immutable {
           s"qp.fvfDomDef${v.counter(this).next()}",
           isGlobal = true))
 
-    (sm, valueDefinitions :+ resourceTriggerDefinition, optDomainDefinition)
+    (sm, valueDefinitions /*:+ resourceTriggerDefinition*/, optDomainDefinition)
   }
 
   private def summarise_predicate_or_wand(s: State,
@@ -462,22 +462,28 @@ object quantifiedChunkSupporter extends QuantifiedChunkSupport with Immutable {
     val additionalFvfArgs = s.functionRecorderQuantifiedVariables()
     val sm = freshSnapshotMap(s, resource, additionalFvfArgs, v)
 
-    val qvar = v.decider.fresh("s", sorts.Snap) /* Quantified snapshot s */
+    val qvar = v.decider.fresh("l", sorts.Loc)
 
-    // Create a replacement map for rewriting e(r_1, r_2, ...) to e(first(s), second(s), ...),
-    // including necessary sort wrapper applications
-    val snapToCodomainTermsSubstitution: Map[Term, Term] =
-      codomainQVars.zip(fromSnapTree(qvar, codomainQVars))(collection.breakOut)
-
+    // TODO explain and rename
+    val snapToCodomainTermsSubstitution: Map[Term, Term] = resource match {
+      case p:ast.Predicate =>
+        toMap(codomainQVars.zipWithIndex.map({ case (a,i) =>
+          (a, PHeapPredicateLocInv(p.name, i, a.sort, qvar))
+        }))
+      case _ => Map()
+    }
+      //codomainQVars.zip(fromSnapTree(qvar, codomainQVars))(collection.breakOut)
+    
     // Rewrite c(r_1, r_2, ...) to c(first(s), second(s), ...)
     val transformedOptSmDomainDefinitionCondition =
       optSmDomainDefinitionCondition.map(_.replace(snapToCodomainTermsSubstitution))
 
     val qvarInDomainOfSummarisingSm = resource match {
       case predicate: ast.Predicate =>
-        SetIn(qvar, PredicateDomain(predicate.name, sm))
+        SetIn(qvar, PHeapPredicateDomain(predicate.name, sm))
       case wand: ast.MagicWand =>
-        SetIn(qvar, PredicateDomain(MagicWandIdentifier(wand, Verifier.program).toString, sm))
+        sys.error("QPMW not implemented.")
+        //SetIn(qvar, PredicateDomain(MagicWandIdentifier(wand, Verifier.program).toString, sm))
     }
 
     val valueDefinitions =
@@ -488,14 +494,18 @@ object quantifiedChunkSupporter extends QuantifiedChunkSupport with Immutable {
         // This is justified even for vacuous predicates (e.g. with body "true") and wands because
         // qvar is the tuple of predicate arguments, and thus unrelated to the actual body
         val snapshotNotUnit =
+          // TODO: Understand and port this
+          True()
+          /*
           if (codomainQVars.nonEmpty) qvar !== Unit
-          else qvar === Unit // TODO: Consider if axioms can be simplified in case codomainQVars is empty
+          else qvar === Unit
+          */
 
         val effectiveCondition =
           And(
             transformedOptSmDomainDefinitionCondition.getOrElse(True()), /* Alternatively: qvarInDomainOfSummarisingSm */
             IsPositive(chunk.perm).replace(snapToCodomainTermsSubstitution))
-
+        
         Forall(
           qvar,
           Implies(effectiveCondition, And(snapshotNotUnit, lookupSummary === lookupChunk)),
@@ -504,13 +514,15 @@ object quantifiedChunkSupporter extends QuantifiedChunkSupport with Immutable {
           isGlobal = true)
       })
 
-    val resourceTriggerDefinition =
+    // TODO: Understand and port this
+    /*val resourceTriggerDefinition =
       Forall(
         qvar,
         And(relevantChunks map (chunk => ResourceTriggerFunction(resource, chunk.snapshotMap, Seq(qvar)))),
         Trigger(ResourceLookup(resource, sm, Seq(qvar))),
         s"qp.psmResTrgDef${v.counter(this).next()}",
         isGlobal = true)
+        */
 
     val optDomainDefinition =
       transformedOptSmDomainDefinitionCondition.map(condition =>
@@ -524,7 +536,7 @@ object quantifiedChunkSupporter extends QuantifiedChunkSupport with Immutable {
           isGlobal = true
         ))
 
-    (sm, valueDefinitions :+ resourceTriggerDefinition, optDomainDefinition)
+    (sm, valueDefinitions /*:+ resourceTriggerDefinition*/, optDomainDefinition)
   }
 
   private def summarisePerm(s: State,
@@ -547,10 +559,13 @@ object quantifiedChunkSupporter extends QuantifiedChunkSupport with Immutable {
         s"qp.resPrmSumDef${v.counter(this).next()}",
         isGlobal = true)
 
-    val resourceTriggerFunction = ResourceTriggerFunction(resource, smDef.sm, codomainQVars)
 
     // TODO: Quantify over snapshot if resource is predicate.
     //       Also check other places where a similar quantifier is constructed.
+
+    // TODO : Understand and port this
+    //val resourceTriggerFunction = ResourceTriggerFunction(resource, smDef.sm, codomainQVars)
+    /*
     val resourceTriggerDefinition =
       Forall(
         codomainQVars,
@@ -560,8 +575,9 @@ object quantifiedChunkSupporter extends QuantifiedChunkSupport with Immutable {
         Trigger(ResourcePermissionLookup(resource, pm, codomainQVars)),
         s"qp.resTrgDef${v.counter(this).next()}",
         isGlobal = true)
+    */
 
-    (pm, Seq(valueDefinitions, resourceTriggerDefinition))
+    (pm, Seq(valueDefinitions))
   }
 
   def summarisingPermissionMap(s: State,
@@ -616,7 +632,6 @@ object quantifiedChunkSupporter extends QuantifiedChunkSupport with Immutable {
                                   v: Verifier,
                                   optQVarsInstantiations: Option[Seq[Term]])
                                  : Unit = {
-
       if (s.smDomainNeeded) {
         optQVarsInstantiations match {
           case None =>
@@ -625,7 +640,10 @@ object quantifiedChunkSupporter extends QuantifiedChunkSupport with Immutable {
           case Some(_instantiations) =>
             // TODO: Avoid pattern matching on resource
             val instantiations = resource match {
-              case _: ast.Predicate | _: ast.MagicWand => Seq(toSnapTree(_instantiations))
+              case p: ast.Predicate => {
+                Seq(PHeapPredicateLoc(p.name, _instantiations))
+              }
+              case _: ast.MagicWand => sys.error("QPMW not implemented.")
               case _: ast.Field => _instantiations
             }
 
@@ -642,7 +660,10 @@ object quantifiedChunkSupporter extends QuantifiedChunkSupport with Immutable {
         case Some(_instantiations) =>
           // TODO: Avoid pattern matching on resource
           val instantiations = resource match {
-            case _: ast.Predicate | _: ast.MagicWand => Seq(toSnapTree(_instantiations))
+            case p: ast.Predicate => {
+              Seq(PHeapPredicateLoc(p.name, _instantiations))
+            }
+            case _: ast.MagicWand => sys.error("QPMW not implemented.")
             case _: ast.Field => _instantiations
           }
 
@@ -651,6 +672,7 @@ object quantifiedChunkSupporter extends QuantifiedChunkSupport with Immutable {
           v.decider.assume(smDef.valueDefinitions.map(_.asInstanceOf[Quantification].instantiate(instantiations)))
       }
     }
+
 
     val (smDef, smCache) =
       s.smCache.get(resource, relevantChunks, optSmDomainDefinitionCondition) match {
@@ -721,7 +743,6 @@ object quantifiedChunkSupporter extends QuantifiedChunkSupport with Immutable {
               v: Verifier)
              (Q: (State, Verifier) => VerificationResult)
              : VerificationResult = {
-
     val gain = PermTimes(tPerm, s.permissionScalingFactor)
     val (ch: QuantifiedBasicChunk, inverseFunctions) =
       quantifiedChunkSupporter.createQuantifiedChunk(
@@ -750,14 +771,14 @@ object quantifiedChunkSupporter extends QuantifiedChunkSupport with Immutable {
                 case field: ast.Field if ft.field == field.name => FieldTrigger(ft.field, tSnap, ft.at)
                 case _ => ft
               }
-            case pt: PredicateTrigger =>
+            /*case pt: PredicateTrigger =>
               resource match {
                 case p: ast.Predicate if pt.predname == p.name =>
                   PredicateTrigger(pt.predname, tSnap, pt.args)
                 case wand: ast.MagicWand if pt.predname == MagicWandIdentifier(wand, Verifier.program).toString =>
                   PredicateTrigger(pt.predname, tSnap, pt.args)
                 case _ => pt
-              }
+              }*/
             case other => other
           }))
 
@@ -827,10 +848,10 @@ object quantifiedChunkSupporter extends QuantifiedChunkSupport with Immutable {
     val (smDef1, smCache1) =
       quantifiedChunkSupporter.summarisingSnapshotMap(
         s, resource, codomainVars, relevantChunks, v)
-    val trigger = ResourceTriggerFunction(resource, smDef1.sm, codomainVars)
+    //val trigger = ResourceTriggerFunction(resource, smDef1.sm, codomainVars)
     val qvarsToInv = inv.qvarsToInversesOf(codomainVars)
     val condOfInv = tCond.replace(qvarsToInv)
-    v.decider.assume(Forall(codomainVars, Implies(condOfInv, trigger), Trigger(inv.inversesOf(codomainVars)))) //effectiveTriggers map (t => Trigger(t.p map (_.replace(qvarsToInv))))))
+    //v.decider.assume(Forall(codomainVars, Implies(condOfInv, trigger), Trigger(inv.inversesOf(codomainVars)))) //effectiveTriggers map (t => Trigger(t.p map (_.replace(qvarsToInv))))))
 
     v.decider.assume(tSnap === smDef1.sm)
     val s1 =
@@ -853,7 +874,8 @@ object quantifiedChunkSupporter extends QuantifiedChunkSupport with Immutable {
                            : VerificationResult = {
     val value = resource match {
       case field: ast.Field => PHeapLookupField(field.name, v.symbolConverter.toSort(field.typ), tSnap, tArgs.head)
-      case _ => sys.error("not implemented")
+      case p: ast.Predicate => PHeapLookupPredicate(p.name, tSnap, tArgs)
+      case _: ast.MagicWand => sys.error("QPMW not implemented")
     }
     val (sm, smValueDef) = quantifiedChunkSupporter.singletonSnapshotMap(s, resource, tArgs, value, v)
     v.decider.prover.comment("Definitional axioms for singleton-SM's value")
@@ -875,7 +897,7 @@ object quantifiedChunkSupporter extends QuantifiedChunkSupport with Immutable {
     val (smDef1, smCache1) =
       quantifiedChunkSupporter.summarisingSnapshotMap(
         s, resource, formalQVars, relevantChunks, v)
-    v.decider.assume(resourceTriggerFactory(smDef1.sm))
+    //v.decider.assume(resourceTriggerFactory(smDef1.sm))
 
     val smDef2 = SnapshotMapDefinition(resource, sm, Seq(smValueDef), Seq())
     val s1 = s.copy(h = h1,
@@ -883,6 +905,14 @@ object quantifiedChunkSupporter extends QuantifiedChunkSupport with Immutable {
                     functionRecorder = s.functionRecorder.recordFvfAndDomain(smDef2),
                     smCache = smCache1)
     Q(s1, v)
+  }
+
+  // TODO: This embedding should be removed eventually by replacing FVFs with PHeaps entirely
+  def embedIntoPHeap(resource: ast.Resource, t: Term) : Term = resource match {
+    case f: ast.Field => FVFToPHeap(f.name, t)
+    // No embedding needed, we already use PHeaps for quantified predicates
+    case p: ast.Predicate => t
+    case _: ast.MagicWand => sys.error("QPMW not implemented.")
   }
 
   def consume(s: State,
@@ -907,7 +937,6 @@ object quantifiedChunkSupporter extends QuantifiedChunkSupport with Immutable {
               v: Verifier)
              (Q: (State, Heap, Term, Verifier) => VerificationResult)
              : VerificationResult = {
-
     val inverseFunctions =
       quantifiedChunkSupporter.getFreshInverseFunctions(
         qvars,
@@ -1033,7 +1062,7 @@ object quantifiedChunkSupporter extends QuantifiedChunkSupport with Immutable {
                 (result, s4, h2, Some(consumedChunk))
               })((s4, optCh, v3) =>
                 optCh match {
-                  case Some(ch) => Q(s4, s4.h, FVFToPHeap(qid, ch.snapshotMap), v3)
+                  case Some(ch) => Q(s4, s4.h, embedIntoPHeap(resource, ch.snapshotMap), v3)
                   case _ => Q(s4, s4.h, v3.decider.fresh(sorts.PHeap), v3)
                 }
               )
@@ -1065,7 +1094,7 @@ object quantifiedChunkSupporter extends QuantifiedChunkSupport with Immutable {
                                    partiallyConsumedHeap = Some(h3),
                                    constrainableARPs = s.constrainableARPs,
                                    smCache = smCache2)
-                  Q(s3, h3, FVFToPHeap(qid, smDef2.sm), v)
+                  Q(s3, h3, this.embedIntoPHeap(resource, smDef2.sm), v)
                 case (Incomplete(_), s2, _) =>
                   createFailure(pve dueTo insufficientPermissionReason, v, s2)}
             }
@@ -1183,8 +1212,9 @@ object quantifiedChunkSupporter extends QuantifiedChunkSupport with Immutable {
           val snapVal = ResourceLookup(resource, smDef1.sm, arguments)
           val snap = resource match {
             case field: ast.Field => PHeapSingletonField(field.name, arguments.head, snapVal)
-            //case _: ast.Predicate | _: ast.MagicWand => PredicateDomain
-            case other => sys.error(s"Not implemented")
+            // TODO: Is this correct? Explain. Seems wrong to have singleton wrapper for fields but not predicates
+            case p: ast.Predicate => snapVal // PHeapSingletonPredicate(p.name, arguments, snapVal)
+            case _: ast.MagicWand => sys.error("QPMW not implemented.")
           }
           Q(s2, h1, snap, v)
         case (Incomplete(_), _, _) =>
@@ -1367,10 +1397,9 @@ object quantifiedChunkSupporter extends QuantifiedChunkSupport with Immutable {
         case field: ast.Field =>
           sorts.FieldValueFunction(v.symbolConverter.toSort(field.typ))
         case predicate: ast.Predicate =>
-          // TODO: Reconsider use of and general design behind s.predicateSnapMap
-          sorts.PredicateSnapFunction(s.predicateSnapMap(predicate))
+          sorts.PHeap
         case _: ast.MagicWand =>
-          sorts.PredicateSnapFunction(sorts.PHeap)
+          sys.error("QPMW not implemented.")
         case _ =>
           sys.error(s"Found yet unsupported resource $resource (${resource.getClass.getSimpleName})")
       }

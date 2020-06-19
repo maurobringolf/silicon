@@ -31,6 +31,7 @@ class DefaultPHeapsContributor(preambleReader: PreambleReader[String, String],
   private var collectedAxioms: Iterable[PreambleBlock] = Seq.empty
 
   private var astAxioms: Iterable[Term] = Seq.empty
+  private var astDecls: Iterable[Decl] = Seq.empty
 
   private def fieldSubstitutions(f: ast.Field) : Map[String, String] = {
     val sort = symbolConverter.toSort(f.typ)
@@ -94,7 +95,11 @@ class DefaultPHeapsContributor(preambleReader: PreambleReader[String, String],
       predicateSingletonPredicateDomains(program.predicates) ++
       fieldSingletonPredicateDomains(program.predicates, program. fields) ++
       fieldSingletonFieldDomains(program.fields)
-    astAxioms = framing_functions(program.predicates, program.fields, program.functions) ++ extensional_equality(program.predicates, program.fields, program.functions)
+    astDecls =
+      predicate_loc_inv_func_decls(program.predicates)
+    astAxioms =
+      framing_functions(program.predicates, program.fields, program.functions) ++ extensional_equality(program.predicates, program.fields, program.functions) ++
+      predicate_loc_inv_func_axioms(program.predicates)
   }
 
   private def extractPreambleLines(from: Iterable[PreambleBlock]*): Iterable[String] =
@@ -171,7 +176,29 @@ class DefaultPHeapsContributor(preambleReader: PreambleReader[String, String],
     Seq((s"PHeap.symmetry_combine", preambleReader.readPreamble(templateFile)))
   }
 
-  // TODO: Extend the meta syntax as needed to write this in SMT-LIB
+  def predicate_loc_inv_func_decls(predicates: Seq[ast.Predicate]): Iterable[FunctionDecl] = {
+    predicates.flatMap(p => {
+      p.formalArgs.zipWithIndex.map({ case (a,i) => 
+        // TODO: Define this in a better place and reuse everywhere
+        val id = s"PHeap.loc_${p.name}_inv_$i"
+        val a_sort = symbolConverter.toSort(a.typ)
+        FunctionDecl(Fun(Identifier(id), Seq(sorts.Loc), a_sort))
+      })
+    })
+  }
+
+  def predicate_loc_inv_func_axioms(predicates: Seq[ast.Predicate]): Iterable[Term] = {
+    predicates.flatMap(p => p.formalArgs.zipWithIndex.map({ case (a,i) =>
+      val a_sort = symbolConverter.toSort(a.typ)
+      val pArgs = p.formalArgs.map(a => Var(Identifier(a.name), symbolConverter.toSort(a.typ)))
+      Forall( pArgs
+            , PHeapPredicateLocInv(p.name, i, a_sort, PHeapPredicateLoc(p.name, pArgs)) === pArgs(i)
+            , Seq(Trigger(PHeapPredicateLocInv(p.name, i, a_sort, PHeapPredicateLoc(p.name, pArgs))))
+            )
+    }))
+  }
+
+  // TODO: Extend the meta syntax as needed to write these in SMT-LIB?
   def extensional_equality( predicates: Seq[ast.Predicate]
                           , fields: Seq[ast.Field]
                           , functions: Seq[ast.Function]
@@ -310,6 +337,7 @@ class DefaultPHeapsContributor(preambleReader: PreambleReader[String, String],
     extractPreambleLines(collectedAxioms)
 
   def emitAxiomsAfterAnalysis(sink: ProverLike): Unit = {
+    astDecls.map(d => sink.declare(d))
     astAxioms.map(ax => sink.assume(ax))
     emitPreambleLines(sink, collectedAxioms)
   }

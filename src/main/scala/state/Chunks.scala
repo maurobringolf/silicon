@@ -105,7 +105,7 @@ case class QuantifiedPredicateChunk(id: BasicChunkIdentifier,
                                     hints: Seq[Term] = Nil)
     extends QuantifiedBasicChunk {
 
-  require(psf.sort.isInstanceOf[terms.sorts.PredicateSnapFunction], s"Quantified predicate chunk values must be of sort PredicateSnapFunction ($psf), but found ${psf.sort}")
+  require(psf.sort == sorts.PHeap, s"Quantified predicate chunk values must be of sort PredicateSnapFunction ($psf), but found ${psf.sort}")
   require(perm.sort == sorts.Perm, s"Permissions $perm must be of sort Perm, but found ${perm.sort}")
 
   override val resourceID = PredicateID

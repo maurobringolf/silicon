@@ -123,6 +123,9 @@ package object utils {
       vs ++ ts :+ l.body
     case PHeapCombine(h1, h2) => h1 :: h2 :: Nil
     case PHeapLookupField(_, _, h, at) => h :: at :: Nil
+    case PHeapPredicateDomain(_, h) => Seq(h)
+    case PHeapPredicateLoc(_, args) => args
+    case PHeapPredicateLocInv(_,_,_,x) => Seq(x)
     case PHeapLookupPredicate(_, h, args) => Seq(h) ++ args
     case PHeapRemovePredicate(_, h, args) => Seq(h) ++ args
     case PHeapSingletonField(_, x, v) => x :: v :: Nil
@@ -255,6 +258,9 @@ package object utils {
 
       case PHeapCombine(h1, h2) => PHeapCombine( go(h1), go(h2))
       case PHeapLookupField(f, s, h, at) => PHeapLookupField(f, s, go(h), go(at))
+      case PHeapPredicateLoc(p, args) => PHeapPredicateLoc(p,args)
+      case PHeapPredicateLocInv(p,i,s,x) => PHeapPredicateLocInv(p,i,s,x)
+      case PHeapPredicateDomain(p, h) => PHeapPredicateDomain(p, go(h))
       case PHeapLookupPredicate(p, h, args) => PHeapLookupPredicate(p, go(h), args map go)
       case PHeapRemovePredicate(p, h, args) => PHeapRemovePredicate(p, go(h), args map go)
       case PHeapSingletonField(f, x, v) => PHeapSingletonField(f, go(x), go(v))

@@ -112,7 +112,6 @@ object predicateSupporter extends PredicateSupportRules with Immutable {
              pa: ast.PredicateAccess)
             (Q: (State, Verifier) => VerificationResult)
             : VerificationResult = {
-
     val gIns = s.g + Store(predicate.formalArgs map (_.localVar) zip tArgs)
     val body = predicate.body.get /* Only non-abstract predicates can be unfolded */
     val s1 = s.scalePermissionFactor(tPerm)
