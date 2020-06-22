@@ -1845,11 +1845,22 @@ case class FieldTrigger(field: String, fvf: Term, at: Term) extends Term {
 
 /* Quantified predicates */
 
-case class PredicateLookup(predname: String, psf: Term, args: Seq[Term]) extends Term {
-  utils.assertSort(psf, "predicate snap function", "PredicateSnapFunction", _.isInstanceOf[sorts.PredicateSnapFunction])
+object PredicateLookup extends ((String, Term, Seq[Term]) => Term) {
+  def apply(predicate: String, h: Term, args: Seq[Term]) = h match {
+    case PHeapSingletonPredicate(`predicate`, `args`, hp) => hp
+    case _ => new PHeapLookupPredicate(predicate, h, args)
+  }
 
-  val sort = psf.sort.asInstanceOf[sorts.PredicateSnapFunction].codomainSort
+  def unapply(lk: PHeapLookupPredicate) = Some((lk.predicate, lk.h, lk.args))
 }
+
+/*
+case class PredicateLookup(predname: String, psf: Term, args: Seq[Term]) extends Term {
+  utils.assertSort(psf, "predicate snap function", "PHeap", _ == sorts.PHeap)
+
+  val sort = sorts.PHeap
+}
+*/
 
 case class PredicatePermLookup(predname: String, pm: Term, args: Seq[Term]) extends Term {
   utils.assertSort(pm, "predicate perm function", "PredicatePermFunction", _.isInstanceOf[sorts.PredicatePermFunction])
@@ -1965,7 +1976,7 @@ object ResourceLookup {
   def apply(predicate: ast.Predicate, sm: Term, args: Seq[Term]): Term =
     PHeapLookupPredicate(predicate.name, sm, args)
 
-  def apply(wand: ast.MagicWand, sm: Term, args: Seq[Term]): PredicateLookup = {
+  def apply(wand: ast.MagicWand, sm: Term, args: Seq[Term]): Term = {
     sys.error("QPMW not implemented.")
   }
 }

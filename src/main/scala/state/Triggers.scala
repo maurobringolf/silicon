@@ -99,7 +99,6 @@ class TriggerGenerator
          | _: SnapshotTerm
          | _: Domain
          | _: Lookup
-         | _: PredicateLookup
          => true
     case _ => false
   }
