@@ -246,6 +246,7 @@ class FunctionData(val programFunction: ast.Function,
 
   def getFieldDoms(pre: ast.Exp) : DomMap[ast.Field] = pre match {
     case ast.And(e1,e2) => mergeDoms(getFieldDoms(e1), getFieldDoms(e2))
+    // TODO: What about the permissions?
     case ast.FieldAccessPredicate(ast.FieldAccess(rcv: ast.Exp, f: ast.Field), _) => {
       val tRcv = expressionTranslator.translatePrecondition(program, Seq(rcv), this).head
       Map(f -> (x => x === tRcv))
@@ -289,13 +290,21 @@ class FunctionData(val programFunction: ast.Function,
 
   def getPredDoms(pre: ast.Exp): DomMap[ast.Predicate] = pre match {
     case ast.And(e1, e2) => mergeDoms(getPredDoms(e1), getPredDoms(e2))
+    // TODO: What about the permissions?
     case ast.PredicateAccessPredicate(ast.PredicateAccess(args, p), _) => {
       val tArgs = expressionTranslator.translatePrecondition(program, args, this)
 
       Map(program.findPredicate(p) -> (x => {
-        // TODO: Stop hacking
+        /**
+         * TODO: I think we can use the PHeapPredicateLocInv to avoid this cast:
+         */
+        // val pArgs = tArgs.zipWithIndex.map({ case (a,i) => PHeapPredicateLocInv(p,i,a.sort,x)})
         val pArgs = x.asInstanceOf[PHeapPredicateLoc].args
         And( pArgs.zip(tArgs).map({ case (a,b) => a === b }))
+        /**
+         * This might also be an alternative,
+         * but I think it relies on injectivity of the Loc function and is more expensive/indirect
+         */
         //x === PHeapPredicateLoc(p, tArgs)
       }))
     }
