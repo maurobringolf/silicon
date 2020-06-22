@@ -246,10 +246,9 @@ class FunctionData(val programFunction: ast.Function,
 
   def getFieldDoms(pre: ast.Exp) : DomMap[ast.Field] = pre match {
     case ast.And(e1,e2) => mergeDoms(getFieldDoms(e1), getFieldDoms(e2))
-    // TODO: What about the permissions?
-    case ast.FieldAccessPredicate(ast.FieldAccess(rcv: ast.Exp, f: ast.Field), _) => {
-      val tRcv = expressionTranslator.translatePrecondition(program, Seq(rcv), this).head
-      Map(f -> (x => x === tRcv))
+    case ast.FieldAccessPredicate(ast.FieldAccess(rcv: ast.Exp, f: ast.Field), p) => {
+      val Seq(tRcv, tp) = expressionTranslator.translatePrecondition(program, Seq(rcv, p), this)
+      Map(f -> (x => And(x === tRcv, Greater(tp, NoPerm()))))
     }
     case n@QuantifiedPermissionAssertion(forall, cond, ast.FieldAccessPredicate(ast.FieldAccess(rcv: ast.Exp, f: ast.Field), p: ast.Exp)) => {
       val (inv, invAx) = qpInversesMap(n.getPrettyMetadata._1)
