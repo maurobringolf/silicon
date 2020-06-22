@@ -1212,8 +1212,7 @@ object quantifiedChunkSupporter extends QuantifiedChunkSupport with Immutable {
           val snapVal = ResourceLookup(resource, smDef1.sm, arguments)
           val snap = resource match {
             case field: ast.Field => PHeapSingletonField(field.name, arguments.head, snapVal)
-            // TODO: Is this correct? Explain. Seems wrong to have singleton wrapper for fields but not predicates
-            case p: ast.Predicate => snapVal // PHeapSingletonPredicate(p.name, arguments, snapVal)
+            case p: ast.Predicate => PHeapSingletonPredicate(p.name, arguments, snapVal)
             case _: ast.MagicWand => sys.error("QPMW not implemented.")
           }
           Q(s2, h1, snap, v)
