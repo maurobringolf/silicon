@@ -387,7 +387,8 @@ object consumer extends ConsumptionRules with Immutable {
               None,
               pve,
               v2
-            )((s3, h3, snap, v3) => {
+            )((s3, h3, snap1, v3) => {
+              val snap = PHeapSingletonPredicate(predicate.name, tArgs, snap1)
               val s4 = s3.copy(constrainableARPs = s1.constrainableARPs,
                                partiallyConsumedHeap = Some(h3))
               Q(s4, h3, snap, v3)})}))
