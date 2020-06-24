@@ -443,7 +443,7 @@ object quantifiedChunkSupporter extends QuantifiedChunkSupport with Immutable {
           s"qp.fvfDomDef${v.counter(this).next()}",
           isGlobal = true))
 
-    (sm, valueDefinitions /*:+ resourceTriggerDefinition*/, optDomainDefinition)
+    (sm, valueDefinitions :+ resourceTriggerDefinition, optDomainDefinition)
   }
 
   private def summarise_predicate_or_wand(s: State,
@@ -513,16 +513,13 @@ object quantifiedChunkSupporter extends QuantifiedChunkSupport with Immutable {
           s"qp.psmValDef${v.counter(this).next()}",
           isGlobal = true)
       })
-
-    // TODO: Understand and port this
-    /*val resourceTriggerDefinition =
+    val resourceTriggerDefinition =
       Forall(
         qvar,
         And(relevantChunks map (chunk => ResourceTriggerFunction(resource, chunk.snapshotMap, Seq(qvar)))),
         Trigger(ResourceLookup(resource, sm, Seq(qvar))),
         s"qp.psmResTrgDef${v.counter(this).next()}",
         isGlobal = true)
-        */
 
     val optDomainDefinition =
       transformedOptSmDomainDefinitionCondition.map(condition =>
@@ -536,7 +533,7 @@ object quantifiedChunkSupporter extends QuantifiedChunkSupport with Immutable {
           isGlobal = true
         ))
 
-    (sm, valueDefinitions /*:+ resourceTriggerDefinition*/, optDomainDefinition)
+    (sm, valueDefinitions :+ resourceTriggerDefinition, optDomainDefinition)
   }
 
   private def summarisePerm(s: State,
@@ -563,9 +560,9 @@ object quantifiedChunkSupporter extends QuantifiedChunkSupport with Immutable {
     // TODO: Quantify over snapshot if resource is predicate.
     //       Also check other places where a similar quantifier is constructed.
 
+    val resourceTriggerFunction = ResourceTriggerFunction(resource, smDef.sm, codomainQVars)
+
     // TODO : Understand and port this
-    //val resourceTriggerFunction = ResourceTriggerFunction(resource, smDef.sm, codomainQVars)
-    /*
     val resourceTriggerDefinition =
       Forall(
         codomainQVars,
@@ -575,9 +572,8 @@ object quantifiedChunkSupporter extends QuantifiedChunkSupport with Immutable {
         Trigger(ResourcePermissionLookup(resource, pm, codomainQVars)),
         s"qp.resTrgDef${v.counter(this).next()}",
         isGlobal = true)
-    */
 
-    (pm, Seq(valueDefinitions))
+    (pm, Seq(valueDefinitions, resourceTriggerDefinition))
   }
 
   def summarisingPermissionMap(s: State,
@@ -771,14 +767,14 @@ object quantifiedChunkSupporter extends QuantifiedChunkSupport with Immutable {
                 case field: ast.Field if ft.field == field.name => FieldTrigger(ft.field, tSnap, ft.at)
                 case _ => ft
               }
-            /*case pt: PredicateTrigger =>
+            case pt: PredicateTrigger =>
               resource match {
                 case p: ast.Predicate if pt.predname == p.name =>
                   PredicateTrigger(pt.predname, tSnap, pt.args)
                 case wand: ast.MagicWand if pt.predname == MagicWandIdentifier(wand, Verifier.program).toString =>
                   PredicateTrigger(pt.predname, tSnap, pt.args)
                 case _ => pt
-              }*/
+              }
             case other => other
           }))
 

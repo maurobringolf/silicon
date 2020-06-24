@@ -241,7 +241,14 @@ class TermToSMTLib2Converter
     case PHeapSingletonPredicate(p, args, h) => parens(text("PHeap.singleton_") <> p <+> args.map(a => convert(a)).mkString(" ") <+> render(h))
     case PHeapRestrict(f, h, args) => parens(text("PHeap.restrict_") <> f <+> convert(h) <+> args.map(a => convert(a)).mkString(" "))
 
-    case PHeapPredicateLoc(p, args) => parens(text("PHeap.loc_") <> p <+> args.map(convert).mkString(" "))
+    case PHeapPredicateLoc(p, args) => {
+      // TODO: Remove this hack
+      if (args.head.sort == sorts.Loc) {
+        render(args.head) 
+      } else {
+        parens(text("PHeap.loc_") <> p <+> args.map(a => convert(a)).mkString(" "))
+      }
+    }
     case PHeapPredicateLocInv(p, idx, _, l) => parens(text("PHeap.loc_") <> p <> text("_inv_") <> text(idx.toString) <+> render(l))
 
     case PHeapPredicateDomain(p, h) => parens(text("PHeap.dom_") <> p <+> convert(h))
