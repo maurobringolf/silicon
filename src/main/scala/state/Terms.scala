@@ -1714,6 +1714,19 @@ object Second extends (Term => Term) {
 
 sealed trait PHeapTerm extends Term { override val sort = sorts.PHeap }
 
+class PHeapEqual(val h1: Term, val h2: Term) extends Term {
+  val sort = sorts.Bool
+}
+
+object PHeapEqual extends ((Term, Term) => Term) {
+  def apply(h1: Term, h2: Term) : Term = h1 match {
+    case `h2` => True()
+    case _ => new PHeapEqual(h1, h2)
+  }
+
+  def unapply(e: PHeapEqual) = Some((e.h1, e.h2))
+}
+
 class PHeapMWS(val lhs: Term, val rhs: Term) extends PHeapTerm
 
 object PHeapMWS extends ((Term, Term) => Term) {

@@ -216,6 +216,8 @@ class TermToSMTLib2Converter
 
     /* PHeaps */
 
+    case PHeapEqual(h1, h2) => parens(text("PHeap.equal") <+> render(h1) <+> render(h2))
+
     //case MagicWandSnapshot(abstractLhs, rhsSnapshot) => 
     case PHeapMWS(lhs, rhs) => parens(text("PHeap.MWS") <+> render(lhs) <+> render(rhs))
     case PHeapLHS(mws) => parens(text("PHeap.LHS") <+> render(mws))

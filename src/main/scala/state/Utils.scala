@@ -121,6 +121,7 @@ package object utils {
     case l: Let =>
       val (vs, ts) = l.bindings.toSeq.unzip
       vs ++ ts :+ l.body
+    case PHeapEqual(h1, h2) => h1 :: h2 :: Nil
     case PHeapCombine(h1, h2) => h1 :: h2 :: Nil
     case PHeapLookupField(_, _, h, at) => h :: at :: Nil
     case PHeapPredicateDomain(_, h) => Seq(h)
@@ -256,6 +257,7 @@ package object utils {
       case PredicatePermLookup(predname, pm, args) => PredicatePermLookup(predname, go(pm), args map go)
       case PredicateTrigger(p, psf, args) => PredicateTrigger(p, go(psf), args map go)
 
+      case PHeapEqual(h1, h2) => PHeapEqual( go(h1), go(h2))
       case PHeapCombine(h1, h2) => PHeapCombine( go(h1), go(h2))
       case PHeapLookupField(f, s, h, at) => PHeapLookupField(f, s, go(h), go(at))
       case PHeapPredicateLoc(p, args) => PHeapPredicateLoc(p,args)

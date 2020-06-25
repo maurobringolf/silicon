@@ -508,7 +508,7 @@ object quantifiedChunkSupporter extends QuantifiedChunkSupport with Immutable {
         
         Forall(
           qvar,
-          Implies(effectiveCondition, And(snapshotNotUnit, lookupSummary === lookupChunk)),
+          Implies(effectiveCondition, And(snapshotNotUnit, And(lookupSummary === lookupChunk, PHeapEqual(lookupSummary, lookupChunk)))),
           if (Verifier.config.disableISCTriggers()) Nil else Seq(Trigger(lookupSummary), Trigger(lookupChunk)),
           s"qp.psmValDef${v.counter(this).next()}",
           isGlobal = true)
