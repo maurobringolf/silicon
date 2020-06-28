@@ -1167,9 +1167,8 @@ object quantifiedChunkSupporter extends QuantifiedChunkSupport with Immutable {
           // TODO: More unified handling of resources
           case Some(ch) =>
             val snap = resource match {
-              case f: ast.Field => {
-                PHeapSingletonField(f.name, arguments.head, ResourceLookup(resource, ch.snapshotMap, arguments))
-              }
+              case f: ast.Field => PHeapSingletonField(f.name, arguments.head, ResourceLookup(resource, ch.snapshotMap, arguments))
+              case p: ast.Predicate => ResourceLookup(resource, ch.snapshotMap, arguments) 
               case _ => sys.error("Quantified resource not implemented: " ++ resource.toString)
             }
             Q(s4, s4.h, snap, v2)
