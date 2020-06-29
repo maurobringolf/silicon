@@ -1782,6 +1782,7 @@ class PHeapPredicateLoc(val predicate: String, val args: Seq[Term]) extends Term
 }
 
 object PHeapPredicateLoc extends ((String, Seq[Term]) => Term) {
+  // TODO: syntactic optimization
   def apply(predicate: String, args: Seq[Term]) = new PHeapPredicateLoc(predicate, args)
 
   def unapply(pl: PHeapPredicateLoc) = Some((pl.predicate, pl.args))
@@ -1790,8 +1791,12 @@ object PHeapPredicateLoc extends ((String, Seq[Term]) => Term) {
 class PHeapPredicateLocInv(val predicate: String, val idx: Int, val sort: Sort, val loc: Term) extends Term
 
 object PHeapPredicateLocInv extends ((String, Int, Sort, Term) => Term) {
-  // TODO: Syntactic optimization
-  def apply(predicate: String, idx: Int, sort: Sort, loc: Term) = new PHeapPredicateLocInv(predicate,idx,sort,loc)
+  def apply(predicate: String, idx: Int, sort: Sort, loc: Term) = loc match {
+    // TODO: enabling this messes with the corresponding axiom,
+    // because its written using these terms and thus simplified as well.
+    //case PHeapPredicateLoc(predicate, args) => args(idx)
+    case _ => new PHeapPredicateLocInv(predicate,idx,sort,loc)
+  }
 
   def unapply(pli: PHeapPredicateLocInv) = Some((pli.predicate, pli.idx, pli.sort, pli.loc))
 }
