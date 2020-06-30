@@ -42,6 +42,8 @@ package object utils {
       // For each trigger, create a new quantifier where all heap dependencies are replaced with the new variables
       .map({ case (ts, m) => Quantification(q.q,
               q.vars ++ m.values.toSeq,
+              // TODO: This would be the premised version which narrows down all projected terms back to their original values (untested)
+              // Implies( And(m.map({ case (t,p) => t === p})), q.body )
               q.body,
               Seq(Trigger(ts.map(replaceHeapDeps(_,m)))), 
               q.name,
