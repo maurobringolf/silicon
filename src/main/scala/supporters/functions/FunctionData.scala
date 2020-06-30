@@ -559,6 +559,6 @@ class FunctionData(val programFunction: ast.Function,
            Seq(Trigger(functionApplication))
         ++ predicateTriggers.values.map(pt => Trigger(Seq(triggerFunctionApplication, pt))))
 
-      Forall(arguments, body, allTriggers)})
+      Forall(arguments, body, allTriggers, s"definitionalAxiom [${function.id.name}]")})
   }
 }
