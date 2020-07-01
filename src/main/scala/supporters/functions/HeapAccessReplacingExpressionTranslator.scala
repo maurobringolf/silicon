@@ -154,6 +154,10 @@ class HeapAccessReplacingExpressionTranslator(symbolConverter: SymbolConverter,
         )
         var teIn = translate(toSort)(eIn)
         this.snap = oldSnap
+
+        // TODO: Why is this cast required?
+        data.predicateLookups = data.predicateLookups :+ PHeapLookupPredicate(predicate, this.snap, args map translate).asInstanceOf[PHeapLookupPredicate]
+
         teIn
 
       case ast.Applying(_, eIn) => translate(toSort)(eIn)

@@ -407,6 +407,8 @@ class FunctionData(val programFunction: ast.Function,
   private[this] var freshMacros: InsertionOrderedSet[MacroDecl] = InsertionOrderedSet.empty
   private[this] var freshSymbolsAcrossAllPhases: InsertionOrderedSet[Decl] = InsertionOrderedSet.empty
 
+  var predicateLookups : Seq[PHeapLookupPredicate] = Seq()
+
   private[functions] def getFreshFieldInvs: InsertionOrderedSet[InverseFunctions] = freshFieldInvs
   private[functions] def getFreshArps: InsertionOrderedSet[Var] = freshArps.map(_._1)
   private[functions] def getFreshSymbolsAcrossAllPhases: InsertionOrderedSet[Decl] = freshSymbolsAcrossAllPhases
@@ -504,45 +506,15 @@ class FunctionData(val programFunction: ast.Function,
    * Properties resulting from phase 2 (verification)
    */
 
+
   lazy val predicateTriggers: Map[ast.Predicate, App] = {
-    val recursiveCallsAndUnfoldings: Seq[(ast.FuncApp, Seq[ast.Unfolding])] =
-      Functions.recursiveCallsAndSurroundingUnfoldings(programFunction)
+    // Could add predicate instances from precondition as well, but currently not done (also not in Carbon)
 
-    val outerUnfoldings: Seq[ast.Unfolding] =
-      recursiveCallsAndUnfoldings.flatMap(_._2.headOption)
-
-    // predicateAccesses initially contains all predicate instances unfolded by the function
-    var predicateAccesses: Seq[ast.PredicateAccess] =
-      if (recursiveCallsAndUnfoldings.isEmpty)
-        Vector.empty
-      else
-        outerUnfoldings map (_.acc.loc)
-
-    // // Could add predicate instances from precondition as well, but currently not done (also not in Carbon)
-    // predicateAccesses ++=
-    //   programFunction.pres.flatMap(_.shallowCollect { case predAcc: ast.PredicateAccess => predAcc })
-
-    // Only keep predicate instances whose arguments do not contain free variables
-    predicateAccesses = {
-      val functionArguments: Seq[ast.AbstractLocalVar] = programFunction.formalArgs.map(_.localVar)
-
-      predicateAccesses.filter(predAcc =>
-        predAcc.args.forall(arg => ast.utility.Expressions.freeVariablesExcluding(arg, functionArguments).isEmpty))
-    }
-
-    toMap(predicateAccesses.map(predAcc => {
-      val predicate = program.findPredicate(predAcc.predicateName)
+    toMap(predicateLookups.map({ case predAcc@PHeapLookupPredicate(p, h, args) =>
+      val predicate = program.findPredicate(p)
       val triggerFunction = predicateData(predicate).triggerFunction
-
-      /* TODO: Don't use translatePrecondition - refactor expressionTranslator */
-      val tArgs = expressionTranslator.translatePrecondition(program, predAcc.args, this)
-      val args = (
-        PHeapLookupPredicate(predAcc.predicateName, predef.`?h`, tArgs)
-      +: tArgs)
-
-      val fapp = App(triggerFunction, args)
-
-      predicate -> fapp
+      val trigger = App(triggerFunction, predAcc +: args)
+      predicate -> trigger
     }))
   }
 
@@ -555,10 +527,28 @@ class FunctionData(val programFunction: ast.Function,
       val pre = And(translatedPres)
       val nestedDefinitionalAxioms = generateNestedDefinitionalAxioms
       val body = And(nestedDefinitionalAxioms ++ List(Implies(pre, And(functionApplication === translatedBody))))
-      val allTriggers = (
-           Seq(Trigger(functionApplication))
-        ++ predicateTriggers.values.map(pt => Trigger(Seq(triggerFunctionApplication, pt))))
 
-      Forall(arguments, body, allTriggers, s"definitionalAxiom [${function.id.name}]")})
+      /**
+       * The predicate trigger should allow an axiom instantiation with arguments such that:
+       *   1. The arguments have been used in a some function application, irrespective of the function snapshot (f%stateless)
+       *   2. The snapshot contains a predicate instance which has been folded or unfolded elsewhere in the program (P%trigger)
+       * However, `h` or `args` can contain variables introduced in the function body via quantifiers and are
+       * thus not eligible as trigger terms in general.
+       **/
+      val (basicPredicateTriggers, extendedPredicateTriggers) = predicateTriggers.values.partition(t => (t.freeVariables -- arguments).isEmpty)
+
+      val basicTriggers =
+           Seq(Trigger(functionApplication)) ++ basicPredicateTriggers.map(pt => Trigger(Seq(triggerFunctionApplication, pt)))
+
+      And(
+        Forall(arguments, body, basicTriggers, s"definitionalAxiom [${function.id.name}]") +: extendedPredicateTriggers.map(pt =>
+          Forall( arguments ++ (pt.freeVariables -- arguments).toSeq
+                , body
+                , Trigger(Seq(triggerFunctionApplication, pt))
+                , s"definitionalAxiomExtended [${function.id.name}]" 
+                )
+        ).toSeq
+      )
+    })
   }
 }
