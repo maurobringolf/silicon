@@ -11,9 +11,9 @@ import viper.silver.ast
 import viper.silicon.Map
 import viper.silicon.rules.functionSupporter
 import viper.silicon.state.{Identifier, SimpleIdentifier, SuffixedIdentifier, SymbolConverter}
+import viper.silicon.state.utils.makeTriggersHeapIndependent
 import viper.silicon.state.terms._
 import viper.silicon.state.terms.predef.`?h`
-import viper.silicon.state.utils.projectHeapDeps
 import viper.silicon.supporters.ExpressionTranslator
 import viper.silver.plugin.PluginAwareReporter
 import viper.silver.reporter.InternalWarningMessage
@@ -135,7 +135,7 @@ class HeapAccessReplacingExpressionTranslator(symbolConverter: SymbolConverter,
         // TODO: Not sure what the interaction with the above renaming transformation is,
         // maybe they need to happen in opposite order or be intertwined in some way
         if (this.shouldProjectHeapDeps) {
-          projectHeapDeps(renamedtQuant, fresh).foldLeft[Term](True())((x,y) => And(x,y))
+          makeTriggersHeapIndependent(renamedtQuant, fresh).foldLeft[Term](True())((x,y) => And(x,y))
         } else {
           renamedtQuant
         }

@@ -14,7 +14,7 @@ package object utils {
 
   // Applies a simple search-and-replace strategy to project heap dependencies of a trigger to quantified variables
   // Splits the quantifier per trigger
-  def projectHeapDeps(q : Quantification, fresh: (String, Sort) => Var) : Seq[Quantification] = {
+  def makeTriggersHeapIndependent(q : Quantification, fresh: (String, Sort) => Var) : Seq[Quantification] = {
     
     def computeHeapDeps(t: Term) : Seq[Term] = t match {
       case App(HeapDepFun(_,_,_), args) => args.flatMap(computeHeapDeps)
@@ -139,8 +139,6 @@ package object utils {
     case PHeapToFVF(_, _, h) => h :: Nil
     case FVFToPHeap(_, fvf) => fvf :: Nil
     case PermLookup(_, pm, at) => pm :: at :: Nil
-    case PredicateDomain(_, psf) => psf :: Nil
-    case PredicateLookup(_, psf, args) => Seq(psf) ++ args
     case PredicatePermLookup(_, pm, args) => Seq(pm) ++ args
     case FieldTrigger(_, fvf, at) => fvf :: at :: Nil
     case PredicateTrigger(_, psf, args) => psf +: args
@@ -254,8 +252,6 @@ package object utils {
       case PermLookup(field, pm, at) => PermLookup(field, go(pm), go(at))
       case FieldTrigger(f, fvf, at) => FieldTrigger(f, go(fvf), go(at))
 
-      case PredicateDomain(p, psf) => PredicateDomain(p, go(psf))
-      case PredicateLookup(p, psf, args) => PredicateLookup(p, go(psf), args map go)
       case PredicatePermLookup(predname, pm, args) => PredicatePermLookup(predname, go(pm), args map go)
       case PredicateTrigger(p, psf, args) => PredicateTrigger(p, go(psf), args map go)
 
