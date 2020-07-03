@@ -105,7 +105,7 @@ case class QuantifiedPredicateChunk(id: BasicChunkIdentifier,
                                     hints: Seq[Term] = Nil)
     extends QuantifiedBasicChunk {
 
-  require(psf.sort == sorts.PHeap, s"Quantified predicate chunk values must be of sort PredicateSnapFunction ($psf), but found ${psf.sort}")
+  require(psf.sort == sorts.PHeap, s"Quantified predicate chunk values must be of sort PHeap ($psf), but found ${psf.sort}")
   require(perm.sort == sorts.Perm, s"Permissions $perm must be of sort Perm, but found ${perm.sort}")
 
   override val resourceID = PredicateID
@@ -113,7 +113,7 @@ case class QuantifiedPredicateChunk(id: BasicChunkIdentifier,
   override def snapshotMap: Term = psf
   override def singletonArguments: Option[Seq[Term]] = singletonArgs
 
-  override def valueAt(args: Seq[Term]) = PredicateLookup(id.name, psf, args)
+  override def valueAt(args: Seq[Term]) = PHeapLookupPredicate(id.name, psf, args)
 
   override def withPerm(newPerm: Term) = QuantifiedPredicateChunk(id, quantifiedVars, psf, newPerm, invs, initialCond, singletonArgs, hints)
   override def withSnapshotMap(newPsf: Term) = QuantifiedPredicateChunk(id, quantifiedVars, newPsf, perm, invs, initialCond, singletonArgs, hints)
@@ -131,7 +131,7 @@ case class QuantifiedMagicWandChunk(id: MagicWandIdentifier,
                                     hints: Seq[Term] = Nil)
     extends QuantifiedBasicChunk {
 
-  require(wsf.sort == terms.sorts.PredicateSnapFunction(sorts.Snap), s"Quantified magic wand chunk values must be of sort MagicWandSnapFunction ($wsf), but found ${wsf.sort}")
+  require(wsf.sort == terms.sorts.PHeap, s"Quantified magic wand chunk values must be of sort PHeap ($wsf), but found ${wsf.sort}")
   require(perm.sort == sorts.Perm, s"Permissions $perm must be of sort Perm, but found ${perm.sort}")
 
   override val resourceID = MagicWandID
@@ -139,7 +139,7 @@ case class QuantifiedMagicWandChunk(id: MagicWandIdentifier,
   override def snapshotMap: Term = wsf
   override def singletonArguments: Option[Seq[Term]] = singletonArgs
 
-  override def valueAt(args: Seq[Term]) = PredicateLookup(id.toString, wsf, args)
+  override def valueAt(args: Seq[Term]) = PHeapLookupPredicate(id.toString, wsf, args)
 
   override def withPerm(newPerm: Term) = QuantifiedMagicWandChunk(id, quantifiedVars, wsf, newPerm, invs, initialCond, singletonArgs, hints)
   override def withSnapshotMap(newWsf: Term) = QuantifiedMagicWandChunk(id, quantifiedVars, newWsf, perm, invs, initialCond, singletonArgs, hints)

@@ -61,11 +61,6 @@ object sorts {
     override lazy val toString = id.toString
   }
 
-  case class PredicateSnapFunction(codomainSort: Sort) extends Sort {
-    val id = Identifier(s"PSF[$codomainSort]")
-    override lazy val toString = id.toString
-  }
-
   case class FieldPermFunction() extends Sort  {
     val id = Identifier("FPM")
     override lazy val toString = id.toString
@@ -1863,33 +1858,10 @@ case class FieldTrigger(field: String, fvf: Term, at: Term) extends Term {
 
 /* Quantified predicates */
 
-object PredicateLookup extends ((String, Term, Seq[Term]) => Term) {
-  def apply(predicate: String, h: Term, args: Seq[Term]) = h match {
-    case PHeapSingletonPredicate(`predicate`, `args`, hp) => hp
-    case _ => new PHeapLookupPredicate(predicate, h, args)
-  }
-
-  def unapply(lk: PHeapLookupPredicate) = Some((lk.predicate, lk.h, lk.args))
-}
-
-/*
-case class PredicateLookup(predname: String, psf: Term, args: Seq[Term]) extends Term {
-  utils.assertSort(psf, "predicate snap function", "PHeap", _ == sorts.PHeap)
-
-  val sort = sorts.PHeap
-}
-*/
-
 case class PredicatePermLookup(predname: String, pm: Term, args: Seq[Term]) extends Term {
   utils.assertSort(pm, "predicate perm function", "PredicatePermFunction", _.isInstanceOf[sorts.PredicatePermFunction])
 
   val sort = sorts.Perm
-}
-
-case class PredicateDomain(predname: String, psf: Term) extends SetTerm /*with PossibleTrigger*/ {
-  utils.assertSort(psf, "predicate snap function", "PredicateSnapFunction", _.isInstanceOf[sorts.PredicateSnapFunction])
-  val elementsSort = sorts.Snap
-  val sort = sorts.Set(elementsSort)
 }
 
 case class PredicateTrigger(predname: String, psf: Term, args: Seq[Term]) extends Term {
@@ -2022,21 +1994,6 @@ object ResourcePermissionLookup {
     PredicatePermLookup(wandId, sm, args)
   }
 }
-
-/* TODO: remove
-case class PsfAfterRelation(predname: String, psf2: Term, psf1: Term) extends BooleanTerm {
-  utils.assertSameSorts[sorts.PredicateSnapFunction](psf2, psf1)
-}
-
-object PsfTop extends (String => Identifier) {
-  def apply(predicateName: String): Identifier = Identifier(s"$$psfTOP_$predicateName")
-}*/
-
-/* Sort wrappers */
-
-/* Note: Sort wrappers should probably not be used as (outermost) triggers
- * because they are optimised away if wrappee `t` already has sort `to`.
- */
 
 /* Note: Sort wrappers should probably not be used as (outermost) triggers
  * because they are optimised away if wrappee `t` already has sort `to`.

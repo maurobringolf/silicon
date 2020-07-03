@@ -51,7 +51,6 @@ class TermToSMTLib2Converter
       ""
 
     case sorts.FieldValueFunction(codomainSort) => text("$FVF<") <> render(codomainSort) <> ">"
-    case sorts.PredicateSnapFunction(codomainSort) => text("$PSF<") <> render(codomainSort) <> ">"
 
     case sorts.FieldPermFunction() => text("$FPM")
     case sorts.PredicatePermFunction() => text("$PPM")
@@ -280,20 +279,11 @@ class TermToSMTLib2Converter
 
     case PermLookup(field, pm, at) => parens(text("$FVF.perm_") <> field <+> render(pm) <+> render(at))
 
-    case PredicateDomain(id, psf) => parens(text("$PSF.domain_") <> id <+> render(psf))
-
-    case PredicateLookup(id, psf, args) =>
-      val snap: Term = toSnapTree(args)
-
-      parens(text("$PSF.lookup_") <> id <+> render(psf) <+> render(snap))
-
     case PredicateTrigger(id, psf, args) =>
       parens(text("$PSF.loc_") <> id <+> render(PHeapPredicateLoc(id, args)) <+> render(PHeapLookupPredicate(id, psf, args)))
 
     case PredicatePermLookup(predname, pm, args) =>
-      val snap: Term = toSnapTree(args)
-
-      parens(text("$PSF.perm_") <> predname <+> render(pm) <+> render(snap))
+      parens(text("$PSF.perm_") <> predname <+> render(pm) <+> render(PHeapPredicateLoc(predname, args)))
 
     /* Other terms */
 
