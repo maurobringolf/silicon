@@ -606,12 +606,16 @@ object quantifiedChunkSupporter extends QuantifiedChunkSupport with Immutable {
                            value: Term,
                            v: Verifier)
                           : (Term, Term) = {
-
-    val additionalSmArgs = s.relevantQuantifiedVariables(arguments)
-    val sm = freshSnapshotMap(s, resource, additionalSmArgs, v)
-    val smValueDef = ResourceLookup(resource, sm, arguments) === value
-
-    (sm, smValueDef)
+    // TODO: Once FVFs are fully replaced with PHeaps, this method can be replaced by a generic PHeapSingleton(resource)
+    // which only distinguishes between resources later (when rendering to SMT2)
+    resource match {
+      case f: ast.Field =>
+        (PHeapToFVF(f.name, v.symbolConverter.toSort(f.typ), PHeapSingletonField(f.name, arguments.head, value)), True())
+      case p: ast.Predicate =>
+        (PHeapSingletonPredicate(p.name, arguments, value), True())
+      case mw: ast.MagicWand =>
+        sys.error("QPMW not implemented")
+    }
   }
 
   def summarisingSnapshotMap(s: State,
@@ -877,6 +881,7 @@ object quantifiedChunkSupporter extends QuantifiedChunkSupport with Immutable {
     v.decider.prover.comment("Definitional axioms for singleton-SM's value")
     val definitionalAxiomMark = v.decider.setPathConditionMark()
     v.decider.assume(smValueDef)
+
     val conservedPcs =
       if (s.recordPcs) (s.conservedPcs.head :+ v.decider.pcs.after(definitionalAxiomMark)) +: s.conservedPcs.tail
       else s.conservedPcs
