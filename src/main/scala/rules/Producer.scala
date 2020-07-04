@@ -14,6 +14,7 @@ import viper.silicon.interfaces.{Failure, VerificationResult}
 import viper.silicon.resources.{FieldID, PredicateID}
 import viper.silicon.state.terms.predef.`?r`
 import viper.silicon.state.terms._
+import viper.silicon.state.utils.freshQuantifierSafe
 import viper.silicon.state._
 import viper.silicon.supporters.functions.NoopFunctionRecorder
 import viper.silicon.verifier.Verifier
@@ -144,8 +145,8 @@ object producer extends ProductionRules with Immutable {
       if (as.tail.isEmpty)
         wrappedProduceTlc(s, snap, a, pve, v)(Q)
       else {
-        val h0 = v.decider.fresh(sorts.PHeap)
-        val h1 = v.decider.fresh(sorts.PHeap)
+        val h0 = freshQuantifierSafe(s, v, sorts.PHeap)
+        val h1 = freshQuantifierSafe(s, v, sorts.PHeap)
 
         v.decider.assume(Equals(snap, PHeapCombine(h0,h1)))
 
