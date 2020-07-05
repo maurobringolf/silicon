@@ -1811,6 +1811,7 @@ case class PHeapPredicateDomain(predicate: String, h: Term) extends Term {
   val sort = sorts.Set(sorts.Loc)
 }
 
+case class PHeapUnfoldPredicate(predicate: String, h: Term, args: Seq[Term]) extends PHeapTerm
 case class PHeapRemovePredicate(predicate: String, h: Term, args: Seq[Term]) extends PHeapTerm
 case class PHeapSingletonField(field: String, x: Term, v: Term) extends PHeapTerm
 case class PHeapSingletonPredicate(predicate: String, args: Seq[Term], h: Term) extends PHeapTerm
