@@ -224,6 +224,7 @@ class TermToSMTLib2Converter
 
     case PHeapLookupField(f, _, h, x) => parens(text("PHeap.lookup_") <> f <+> render(h) <+> render(x))
     case PHeapFieldDomain(f, h) => parens(text("PHeap.dom_") <> f <+> render(h))
+    case PHeapUnfoldPredicate(p, h, args) => parens(text("PHeap.unfold_") <> p <+> render(h) <+> args.map(a => convert(a)).mkString(" "))
     case PHeapLookupPredicate(p, h, args) => parens(text("PHeap.lookup_") <> p <+> render(h) <+> (
       if (args.length > 0) {
         // TODO: Remove this hack

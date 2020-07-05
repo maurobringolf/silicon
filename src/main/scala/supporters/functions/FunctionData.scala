@@ -65,25 +65,33 @@ class FunctionData(val programFunction: ast.Function,
       x -> Var(identifierFactory.fresh(x.name),
                symbolConverter.toSort(x.typ)))
 
+  val axiomFormalArgs: Map[ast.AbstractLocalVar, Var] = toMap(
+    for (arg <- programFunction.formalArgs;
+         x = arg.localVar)
+    yield
+      x -> Var(Identifier(x.name),
+               symbolConverter.toSort(x.typ)))
+
   val formalResult = Var(identifierFactory.fresh(programFunction.result.name),
                          symbolConverter.toSort(programFunction.result.typ))
 
   val arguments = Seq(`?h`) ++ formalArgs.values
+  val axiomArguments = functionSupporter.axiomSnapshotVariable +: axiomFormalArgs.values.toSeq
 
-  val functionApplication = App(function, `?h` +: formalArgs.values.toSeq)
-  val restrictHeapApplication = App(restrictHeapFunction, arguments)
-  val restrictedLimitedFunctionApplication = App(limitedFunction, restrictHeapApplication +: formalArgs.values.toSeq)
-  val limitedFunctionApplication = App(limitedFunction, `?h` +: formalArgs.values.toSeq)
-  val triggerFunctionApplication = App(statelessFunction, formalArgs.values.toSeq)
+  val functionApplication = App(function, axiomArguments)
+  val restrictHeapApplication = App(restrictHeapFunction, axiomArguments)
+  val restrictedLimitedFunctionApplication = App(limitedFunction, restrictHeapApplication +: axiomFormalArgs.values.toSeq)
+  val limitedFunctionApplication = App(limitedFunction, axiomArguments)
+  val triggerFunctionApplication = App(statelessFunction, axiomFormalArgs.values.toSeq)
 
   val limitedAxiom =
-    Forall(arguments,
+    Forall(axiomArguments,
            restrictedLimitedFunctionApplication === functionApplication,
            Trigger(functionApplication),
            s"limitedAxiom [${function.id.name}]")
 
   val triggerAxiom =
-    Forall(arguments, triggerFunctionApplication, Trigger(limitedFunctionApplication), s"triggerAxiom [${function.id.name}]")
+    Forall(axiomArguments, triggerFunctionApplication, Trigger(limitedFunctionApplication), s"triggerAxiom [${function.id.name}]")
 
   // Maps a QP assertion (identified by program position) to its inverse receiver function and axioms for it
   type QPinvMap = Map[ast.Position, (Fun, Seq[Term])]
@@ -102,8 +110,10 @@ class FunctionData(val programFunction: ast.Function,
           val tp = expressionTranslator.translatePrecondition(program, Seq(p), this).head
           Greater(tp, NoPerm())
       }
+      // TODO: What about unfoldings? I don't think that "h" is always correct here.
+      // It should probably have recursion over the snapshot like the translate() method for the body.
       Some(Ite( tCond
-              , PHeapSingletonPredicate(pred, tArgs, PHeapLookupPredicate(pred, `?h`, tArgs))
+              , PHeapSingletonPredicate(pred, tArgs, PHeapLookupPredicate(pred, functionSupporter.axiomSnapshotVariable , tArgs))
               , predef.Emp
       ))
     case ast.And(e1, e2) =>
@@ -119,9 +129,10 @@ class FunctionData(val programFunction: ast.Function,
           val tp = expressionTranslator.translatePrecondition(program, Seq(p), this).head
           Greater(tp, NoPerm())
       }
-
+      // TODO: What about unfoldings? I don't think that "h" is always correct here.
+      // It should probably have recursion over the snapshot like the translate() method for the body.
       Some(Ite( tCond
-              , PHeapSingletonField(f.name,tx, PHeapLookupField(f.name, symbolConverter.toSort(f.typ), `?h`, tx))
+              , PHeapSingletonField(f.name,tx, PHeapLookupField(f.name, symbolConverter.toSort(f.typ), functionSupporter.axiomSnapshotVariable , tx))
               , predef.Emp
       ))
     case ast.CondExp(iff, thn, els) =>
@@ -152,7 +163,7 @@ class FunctionData(val programFunction: ast.Function,
 
     if (!preContainsQP) {
       val dom = if (programFunction.pres.isEmpty) predef.Emp else translatedDomains.map(_.get).reduce((h1, h2) => PHeapCombine(h1,h2))
-      return Forall(arguments, restrictHeapApplication === dom, Trigger(restrictHeapApplication), s"restrictHeapAxiom [${function.id.name}]")
+      return Forall(axiomArguments, restrictHeapApplication === dom, Trigger(restrictHeapApplication), s"restrictHeapAxiom [${function.id.name}]")
     } else {
       val pre = if (programFunction.pres.isEmpty) ast.BoolLit(true)() else programFunction.pres.reduce((p1,p2) => ast.And(p1,p2)())
       val fieldDoms : DomMap[ast.Field] = getFieldDoms(pre)
@@ -163,10 +174,10 @@ class FunctionData(val programFunction: ast.Function,
         val pArgs = p.formalArgs.map(x => Var(identifierFactory.fresh(x.name), symbolConverter.toSort(x.typ)))
         val x = Var(identifierFactory.fresh("loc"), sorts.Loc)
 
-        Forall( arguments
+        Forall( axiomArguments
               , Forall( Seq(x)
                       , And( Iff(SetIn(x, PHeapPredicateDomain(p.name, restrictHeapApplication)), dom(x))
-                           , Implies(SetIn(x, PHeapPredicateDomain(p.name, restrictHeapApplication)), PHeapLookupPredicate(p.name, restrictHeapApplication, Seq(x)) === PHeapLookupPredicate(p.name, `?h`, Seq(x))))
+                           , Implies(SetIn(x, PHeapPredicateDomain(p.name, restrictHeapApplication)), PHeapLookupPredicate(p.name, restrictHeapApplication, Seq(x)) === PHeapLookupPredicate(p.name, axiomArguments.head, Seq(x))))
                       , Seq( Trigger(SetIn(x, PHeapPredicateDomain(p.name, restrictHeapApplication)))
                           , Trigger(PHeapLookupPredicate(p.name, restrictHeapApplication, Seq(x)))))
               , Seq(Trigger(restrictHeapApplication))
@@ -177,10 +188,10 @@ class FunctionData(val programFunction: ast.Function,
         val x = Var(identifierFactory.fresh("x"), sorts.Ref)
         val fSort = symbolConverter.toSort(typ)
 
-        Forall( arguments
+        Forall( axiomArguments
               , Forall( Seq(x)
                       , And( Iff(SetIn(x, PHeapFieldDomain(name, restrictHeapApplication)), dom(x))
-                          , PHeapLookupField(name, fSort, restrictHeapApplication, x) === PHeapLookupField(name, fSort, `?h`, x))
+                          , PHeapLookupField(name, fSort, restrictHeapApplication, x) === PHeapLookupField(name, fSort, axiomArguments.head, x))
                       , Seq( Trigger(PHeapLookupField(name, fSort, restrictHeapApplication, x))
                           , Trigger(SetIn(x, PHeapFieldDomain(name, restrictHeapApplication)))))
               , Seq(Trigger(restrictHeapApplication))
@@ -215,21 +226,21 @@ class FunctionData(val programFunction: ast.Function,
       // contains some edge cases.
       val invName = "QPinv_" ++ this.function.id.toString ++ "_" ++ node.getPrettyMetadata._1.toString
       val inv = Fun( Identifier(invName)
-                   , sorts.Ref +: arguments.map(_.sort)
+                   , sorts.Ref +: axiomArguments.map(_.sort)
                    , qSort)
 
-      val leftInverse = Forall( qi +: arguments
-                              , Implies(And(tCond, Greater(tPerm, Zero)), (App(inv, tRcv +: arguments) === qi))
-                              , Seq(Trigger(App(inv, tRcv +: arguments)))
+      val leftInverse = Forall( qi +: axiomArguments
+                              , Implies(And(tCond, Greater(tPerm, Zero)), (App(inv, tRcv +: axiomArguments) === qi))
+                              , Seq(Trigger(App(inv, tRcv +: axiomArguments)))
                               , "leftInverse")
       
       val r = Var(identifierFactory.fresh("r"), sorts.Ref)
-      val tCondr = tCond.replace(qi, App(inv,r +: arguments))
-      val tPermr = tPerm.replace(qi, App(inv,r +: arguments))
-      val tRcvr = tRcv.replace(qi, App(inv,r +: arguments))
-      val rightInverse = Forall( r +: arguments
+      val tCondr = tCond.replace(qi, App(inv,r +: axiomArguments))
+      val tPermr = tPerm.replace(qi, App(inv,r +: axiomArguments))
+      val tRcvr = tRcv.replace(qi, App(inv,r +: axiomArguments))
+      val rightInverse = Forall( r +: axiomArguments
                               , Implies(And(tCondr, Greater(tPermr, Zero)), tRcvr === r)
-                              , Seq(Trigger(App(inv,r +: arguments)))
+                              , Seq(Trigger(App(inv,r +: axiomArguments)))
                               , "rightInverse")
 
       Map(node.getPrettyMetadata._1 -> (inv, Seq(leftInverse, rightInverse)))
@@ -259,21 +270,21 @@ class FunctionData(val programFunction: ast.Function,
 
       val inv = Fun( Identifier(invName)
                    // TODO: Would be clearer if predicate arg sorts were taken from predicate instead of tArgs
-                   , tArgs.map(_.sort) ++ arguments.map(_.sort)
+                   , tArgs.map(_.sort) ++ axiomArguments.map(_.sort)
                    , qSort)
 
-      val leftInverse = Forall( qi +: arguments
-                              , Implies(And(tCond, Greater(tPerm, Zero)), (App(inv, tArgs ++ arguments) === qi))
-                              , Seq(Trigger(App(inv, tArgs ++ arguments)))
+      val leftInverse = Forall( qi +: axiomArguments
+                              , Implies(And(tCond, Greater(tPerm, Zero)), (App(inv, tArgs ++ axiomArguments) === qi))
+                              , Seq(Trigger(App(inv, tArgs ++ axiomArguments)))
                               , "leftInverse")
 
       val rs = tArgs.map(x => Var(identifierFactory.fresh("r"), x.sort))
-      val tCondr = tCond.replace(qi, App(inv,rs ++ arguments))
-      val tPermr = tPerm.replace(qi, App(inv,rs ++ arguments))
-      val tRcvr = tArgs.map(_.replace(qi, App(inv,rs ++ arguments)))
-      val rightInverse = Forall( rs ++ arguments
+      val tCondr = tCond.replace(qi, App(inv,rs ++ axiomArguments))
+      val tPermr = tPerm.replace(qi, App(inv,rs ++ axiomArguments))
+      val tRcvr = tArgs.map(_.replace(qi, App(inv,rs ++ axiomArguments)))
+      val rightInverse = Forall( rs ++ axiomArguments
                               , Implies(And(tCondr, Greater(tPermr, Zero)), And(tRcvr.zip(rs).map({ case (x,y) => x === y})))
-                              , Seq(Trigger(App(inv,rs ++ arguments)))
+                              , Seq(Trigger(App(inv,rs ++ axiomArguments)))
                               , "rightInverse")
 
       Map(node.getPrettyMetadata._1 -> (inv, Seq(leftInverse, rightInverse)))
@@ -306,7 +317,7 @@ class FunctionData(val programFunction: ast.Function,
       val Seq(tFa) = expressionTranslator.translatePrecondition(program, Seq(proxyFa), this)
       
       val i = tFa.asInstanceOf[Quantification].vars.head
-      Map(f -> (r => tFa.asInstanceOf[Quantification].body.replace(i, App(inv, r +: arguments))))
+      Map(f -> (r => tFa.asInstanceOf[Quantification].body.replace(i, App(inv, r +: axiomArguments))))
     }
     case n@QuantifiedPermissionAssertion(forall, cond, _: ast.PredicateAccessPredicate) =>
       toMap(program.fields.zip(Seq.fill(program.fields.length){(_:Term) => False()}))
@@ -366,7 +377,7 @@ class FunctionData(val programFunction: ast.Function,
       val Seq(tFa) = expressionTranslator.translatePrecondition(program, Seq(proxyFa), this)
      
       val i = tFa.asInstanceOf[Quantification].vars.head
-      Map(program.findPredicate(pred) -> ((l: Term) => tFa.asInstanceOf[Quantification].body.replace(i, App(inv, args.zipWithIndex.map({ case (a,i) => PHeapPredicateLocInv(pred, i, symbolConverter.toSort(a.typ), l)}) ++ arguments))))
+      Map(program.findPredicate(pred) -> ((l: Term) => tFa.asInstanceOf[Quantification].body.replace(i, App(inv, args.zipWithIndex.map({ case (a,i) => PHeapPredicateLocInv(pred, i, symbolConverter.toSort(a.typ), l)}) ++ axiomArguments))))
     }
 
     case ast.CondExp(cond,e1,e2) =>
@@ -457,7 +468,7 @@ class FunctionData(val programFunction: ast.Function,
     // but they should be resolved with Mauro's current work on heap snapshots.
     // Once his changes are merged in, the commented warnings below should be turned into errors.
     nested.filter(term => {
-      val freeVars = term.freeVariables -- arguments
+      val freeVars = term.freeVariables -- axiomArguments
 
     //if (freeVars.nonEmpty) {
     //  val messageText = (
@@ -495,7 +506,7 @@ class FunctionData(val programFunction: ast.Function,
       val bodyBindings: Map[Var, Term] = Map(formalResult -> limitedFunctionApplication)
       val body = Let(toMap(bodyBindings), innermostBody)
 
-      Some(Forall(arguments, body, Trigger(limitedFunctionApplication), s"postAxiom [${function.id.name}]"))
+      Some(Forall(axiomArguments, body, Trigger(limitedFunctionApplication), s"postAxiom [${function.id.name}]"))
     } else
       None
   }

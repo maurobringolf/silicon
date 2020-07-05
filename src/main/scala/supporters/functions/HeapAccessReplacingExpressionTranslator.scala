@@ -13,7 +13,6 @@ import viper.silicon.rules.functionSupporter
 import viper.silicon.state.{Identifier, SimpleIdentifier, SuffixedIdentifier, SymbolConverter}
 import viper.silicon.state.utils.makeTriggersHeapIndependent
 import viper.silicon.state.terms._
-import viper.silicon.state.terms.predef.`?h`
 import viper.silicon.supporters.ExpressionTranslator
 import viper.silver.plugin.PluginAwareReporter
 import viper.silver.reporter.InternalWarningMessage
@@ -32,7 +31,7 @@ class HeapAccessReplacingExpressionTranslator(symbolConverter: SymbolConverter,
   private var ignoreAccessPredicates = false
   private var failed = false
   private var shouldProjectHeapDeps = false
-  private var snap: Term = `?h`
+  private var snap: Term = functionSupporter.axiomSnapshotVariable
 
   var functionData: Map[ast.Function, FunctionData] = _
 
@@ -47,7 +46,7 @@ class HeapAccessReplacingExpressionTranslator(symbolConverter: SymbolConverter,
     this.failed = false
 
     // Unfoldings can update this variable to flatten heap this during body translation
-    this.snap = `?h`
+    this.snap = functionSupporter.axiomSnapshotVariable
 
     val result = func.body map translate
 
@@ -67,7 +66,8 @@ class HeapAccessReplacingExpressionTranslator(symbolConverter: SymbolConverter,
     this.program = program
     this.data = data
     this.failed = false
-    this.snap = `?h`
+    this.snap = functionSupporter.axiomSnapshotVariable
+
     this.shouldProjectHeapDeps = true
 
     posts.map(p => translate(symbolConverter.toSort _)(p.whenInhaling))
@@ -82,7 +82,9 @@ class HeapAccessReplacingExpressionTranslator(symbolConverter: SymbolConverter,
     this.data = data
     this.ignoreAccessPredicates = true
     this.failed = false
-    this.snap = `?h`
+    this.snap = functionSupporter.axiomSnapshotVariable
+
+
     this.shouldProjectHeapDeps = false
 
     pres.map(p => translate(symbolConverter.toSort _)(p.whenExhaling))
@@ -103,7 +105,7 @@ class HeapAccessReplacingExpressionTranslator(symbolConverter: SymbolConverter,
       case _: ast.Result => data.formalResult
 
       case v: ast.AbstractLocalVar =>
-        data.formalArgs.get(v) match {
+        data.axiomFormalArgs.get(v) match {
           case Some(t) => t
           case None => Var(Identifier(v.name), toSort(v.typ))
         }
@@ -148,10 +150,7 @@ class HeapAccessReplacingExpressionTranslator(symbolConverter: SymbolConverter,
 
       case ast.Unfolding(ast.PredicateAccessPredicate(ast.PredicateAccess(args, predicate), p), eIn) =>
         var oldSnap = this.snap
-        this.snap = PHeapCombine(
-          PHeapLookupPredicate(predicate, this.snap, args map translate),
-          PHeapRemovePredicate(predicate, this.snap, args map translate)
-        )
+        this.snap = PHeapUnfoldPredicate(predicate, this.snap, args map translate)
         var teIn = translate(toSort)(eIn)
         this.snap = oldSnap
         teIn

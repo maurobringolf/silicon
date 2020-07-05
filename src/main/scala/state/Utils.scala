@@ -136,6 +136,7 @@ package object utils {
     case PHeapPredicateLocInv(_,_,_,x) => Seq(x)
     case PHeapLookupPredicate(_, h, args) => Seq(h) ++ args
     case PHeapRemovePredicate(_, h, args) => Seq(h) ++ args
+    case PHeapUnfoldPredicate(_, h, args) => Seq(h) ++ args
     case PHeapSingletonField(_, x, v) => x :: v :: Nil
     case PHeapSingletonPredicate(_, args, h) => Seq(h) ++ args 
     case PHeapRestrict(_, h, args) => Seq(h) ++ args
@@ -268,6 +269,7 @@ package object utils {
       case PHeapPredicateDomain(p, h) => PHeapPredicateDomain(p, go(h))
       case PHeapLookupPredicate(p, h, args) => PHeapLookupPredicate(p, go(h), args map go)
       case PHeapRemovePredicate(p, h, args) => PHeapRemovePredicate(p, go(h), args map go)
+      case PHeapUnfoldPredicate(p, h, args) => PHeapUnfoldPredicate(p, go(h), args map go)
       case PHeapSingletonField(f, x, v) => PHeapSingletonField(f, go(x), go(v))
       case PHeapSingletonPredicate(p, args, h) => PHeapSingletonPredicate(p, args map go, go(h))
       case PHeapRestrict(g, h, args) => PHeapRestrict(g, go(h), args map go)
