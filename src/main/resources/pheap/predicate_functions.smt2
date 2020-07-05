@@ -5,10 +5,10 @@
 (declare-fun PHeap.singleton_$PRD$ ($PRD_ARGS_S$ PHeap) PHeap)
 (declare-fun PHeap.remove_$PRD$ (PHeap $PRD_ARGS_S$) PHeap)
 
-(define-fun PHeap.unfold_$PRD$ ((h PHeap) $PRD_ARGS_Q$) PHeap
+(define-fun PHeap.unfold_$PRD$ ((h PHeap) $PRD_ARGS_Q$ (rc Bool)) PHeap
 	(PHeap.combine
 		(PHeap.lookup_$PRD$ h $PRD_LOC$)
-		(PHeap.remove_$PRD$ h $PRD_ARGS$)
+		(ite rc (PHeap.remove_$PRD$ h $PRD_ARGS$) h)
 	))
 
 (assert (forall ($PRD_ARGS_Q$ (h PHeap)) (!

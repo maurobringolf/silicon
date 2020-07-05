@@ -149,9 +149,17 @@ class HeapAccessReplacingExpressionTranslator(symbolConverter: SymbolConverter,
         PHeapLookupPredicate(pred, this.snap, args map translate)
 
       case ast.Unfolding(ast.PredicateAccessPredicate(ast.PredicateAccess(args, predicate), p), eIn) =>
-        var oldSnap = this.snap
-        this.snap = PHeapUnfoldPredicate(predicate, this.snap, args map translate)
-        var teIn = translate(toSort)(eIn)
+
+        val removalCondition = p match {
+          // Unfolding a wildcard never removes the predicate instance
+          case _: ast.WildcardPerm => False()
+          // TODO: Compute the symbolic condition
+          case _ => True()
+        }
+
+        val oldSnap = this.snap
+        this.snap = PHeapUnfoldPredicate(predicate, this.snap, args map translate, removalCondition)
+        val teIn = translate(toSort)(eIn)
         this.snap = oldSnap
 
         // TODO: Why is this cast required?
