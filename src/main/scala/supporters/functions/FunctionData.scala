@@ -53,10 +53,13 @@ class FunctionData(val programFunction: ast.Function,
   val statelessFunction = functionSupporter.statelessVersion(function)
   val restrictHeapFunction = functionSupporter.restrictHeapFunction(function)
 
+  // Maps a QP assertion (identified by program position) to its inverse receiver functions with axioms (one per quantified variable)
+  type QPinvMap = Map[ast.Position, (Seq[Term], Map[Var, Fun])]
+
   lazy val qpInversesMap : QPinvMap = if (programFunction.pres.isEmpty) Map.empty else getQPInversesMap(programFunction.pres.reduce((p1,p2) => ast.And(p1,p2)()))
 
-  def qpInverses : Seq[Fun] = qpInversesMap.map(_._2._1).toSeq
-  def qpInversesAxioms : Seq[Term] = qpInversesMap.flatMap(_._2._2).toSeq
+  def qpInverses : Iterable[Fun] = qpInversesMap.values.flatMap(_._2.values)
+  def qpInversesAxioms : Iterable[Term] = qpInversesMap.values.flatMap(_._1)
 
   val formalArgs: Map[ast.AbstractLocalVar, Var] = toMap(
     for (arg <- programFunction.formalArgs;
@@ -93,8 +96,6 @@ class FunctionData(val programFunction: ast.Function,
   val triggerAxiom =
     Forall(axiomArguments, triggerFunctionApplication, Trigger(limitedFunctionApplication), s"triggerAxiom [${function.id.name}]")
 
-  // Maps a QP assertion (identified by program position) to its inverse receiver function and axioms for it
-  type QPinvMap = Map[ast.Position, (Fun, Seq[Term])]
   // TODO: Use Resource ast type instead of general K type parameter
   // Maps a resource to a Boolean term parametrized by the receiver
   // e.g. If field f maps to function g, then g(x):Bool is a Term describing the condition under
@@ -207,51 +208,53 @@ class FunctionData(val programFunction: ast.Function,
     case ast.CondExp(cond,e1,e2) => getQPInversesMap(e1) ++ getQPInversesMap(e2)
     case ast.Implies(prem, conc) => getQPInversesMap(conc)
     case node@QuantifiedPermissionAssertion(forall,cond,ast.FieldAccessPredicate(ast.FieldAccess(rcv: ast.Exp, f: ast.Field), perm: ast.Exp)) => {
-      // TODO: Why do we only look at one variable? Multiple are allowed too?
-      val qSort = symbolConverter.toSort(forall.variables.head.typ)
-
-      val proxyFa = ast.Forall(forall.variables, Seq(), ast.BoolLit(true)())()
       
+      val proxyFa = ast.Forall(forall.variables, Seq(), ast.BoolLit(true)())()
       val notWildcardPerm: ast.Exp = perm match {
         case _:ast.WildcardPerm => ast.FullPerm()()
         case p => p
       }
 
       val Seq(tFa, tRcv, tCond, tPerm) = expressionTranslator.translatePrecondition(program, Seq(proxyFa, rcv, cond, notWildcardPerm), this)
-      val qi = tFa.asInstanceOf[Quantification].vars.head
 
-      // TODO: Ideally we would use source position in the name,
-      // such that the assocation is clear. But it seems that with macros
-      // the positions are not maintained? For example the testcase 'quantifiedpermissions/misc/heap_dependent_triggers.vpr'
-      // contains some edge cases.
-      val invName = "QPinv_" ++ this.function.id.toString ++ "_" ++ node.getPrettyMetadata._1.toString
-      val inv = Fun( Identifier(invName)
-                   , sorts.Ref +: axiomArguments.map(_.sort)
-                   , qSort)
+      val qs = tFa.asInstanceOf[Quantification].vars
 
-      val leftInverse = Forall( qi +: axiomArguments
-                              , Implies(And(tCond, Greater(tPerm, Zero)), (App(inv, tRcv +: axiomArguments) === qi))
-                              , Seq(Trigger(App(inv, tRcv +: axiomArguments)))
-                              , "leftInverse")
-      
+      val invs = qs.map(qi => {
+        // TODO: Ideally we would use source position in the name,
+        // such that the assocation is clear. But it seems that with macros
+        // the positions are not maintained? For example the testcase 'quantifiedpermissions/misc/heap_dependent_triggers.vpr'
+        // contains some edge cases.
+        val invName = "QPinv_" ++ this.function.id.toString ++ "_" ++ node.getPrettyMetadata._1.toString ++ "_" ++ qi.id.name
+
+        val inv = Fun( Identifier(invName)
+                     , sorts.Ref +: axiomArguments.map(_.sort)
+                     , qi.sort)
+
+        val leftInverse = Forall( qs ++ axiomArguments
+                                , Implies(And(tCond, Greater(tPerm, Zero)), (App(inv, tRcv +: axiomArguments) === qi))
+                                , Seq(Trigger(App(inv, tRcv +: axiomArguments)))
+                                , "leftInverse")
+        (inv, leftInverse)
+      })
+
+
+      // There is only one right-inverse axiom
       val r = Var(identifierFactory.fresh("r"), sorts.Ref)
-      val tCondr = tCond.replace(qi, App(inv,r +: axiomArguments))
-      val tPermr = tPerm.replace(qi, App(inv,r +: axiomArguments))
-      val tRcvr = tRcv.replace(qi, App(inv,r +: axiomArguments))
+      val qsAsInvs = invs.map({ case (inv, _) => App(inv,r +: axiomArguments)})
+      val tCondr = tCond.replace(qs, qsAsInvs)
+      val tPermr = tPerm.replace(qs, qsAsInvs)
+      val tRcvr = tRcv.replace(qs, qsAsInvs)
       val rightInverse = Forall( r +: axiomArguments
                               , Implies(And(tCondr, Greater(tPermr, Zero)), tRcvr === r)
-                              , Seq(Trigger(App(inv,r +: axiomArguments)))
+                              , Seq(Trigger(qsAsInvs))
                               , "rightInverse")
 
-      Map(node.getPrettyMetadata._1 -> (inv, Seq(leftInverse, rightInverse)))
+      Map(node.getPrettyMetadata._1 -> ((rightInverse +: invs.map(_._2), toMap[Var, Fun](qs.zip(invs.map(_._1))))))
     }
 
     case node@QuantifiedPermissionAssertion(forall,cond,ast.PredicateAccessPredicate(ast.PredicateAccess(args, pred), perm: ast.Exp)) => {
-      // TODO: Why do we only look at one variable? Multiple are allowed too?
-      val qSort = symbolConverter.toSort(forall.variables.head.typ)
 
       val proxyFa = ast.Forall(forall.variables, Seq(), ast.BoolLit(true)())()
-      
       val notWildcardPerm: ast.Exp = perm match {
         case _:ast.WildcardPerm => ast.FullPerm()()
         case p => p
@@ -259,35 +262,40 @@ class FunctionData(val programFunction: ast.Function,
 
       val Seq(tFa, tCond, tPerm) = expressionTranslator.translatePrecondition(program, Seq(proxyFa, cond, notWildcardPerm), this)
       val tArgs = expressionTranslator.translatePrecondition(program, args, this)
-      val qi = tFa.asInstanceOf[Quantification].vars.head
 
-      // TODO: Ideally we would use source position in the name,
-      // such that the assocation is clear. But it seems that with macros
-      // the positions are not maintained? For example the testcase 'quantifiedpermissions/misc/heap_dependent_triggers.vpr'
-      // contains some edge cases.
-      val invName = "QPinv_" ++ this.function.id.toString ++ "_" ++ node.getPrettyMetadata._1.toString
+      val qs = tFa.asInstanceOf[Quantification].vars
 
+      val invs = qs.map(qi => {
+        // TODO: Ideally we would use source position in the name,
+        // such that the assocation is clear. But it seems that with macros
+        // the positions are not maintained? For example the testcase 'quantifiedpermissions/misc/heap_dependent_triggers.vpr'
+        // contains some edge cases.
+        val invName = "QPinv_" ++ this.function.id.toString ++ "_" ++ node.getPrettyMetadata._1.toString ++ "_" ++ qi.id.name
 
-      val inv = Fun( Identifier(invName)
-                   // TODO: Would be clearer if predicate arg sorts were taken from predicate instead of tArgs
-                   , tArgs.map(_.sort) ++ axiomArguments.map(_.sort)
-                   , qSort)
+        val inv = Fun( Identifier(invName)
+                     , sorts.Loc +: axiomArguments.map(_.sort)
+                     , qi.sort)
 
-      val leftInverse = Forall( qi +: axiomArguments
-                              , Implies(And(tCond, Greater(tPerm, Zero)), (App(inv, tArgs ++ axiomArguments) === qi))
-                              , Seq(Trigger(App(inv, tArgs ++ axiomArguments)))
-                              , "leftInverse")
+        val leftInverse = Forall( qs ++ axiomArguments
+                                , Implies(And(tCond, Greater(tPerm, Zero)), (App(inv, PHeapPredicateLoc(pred, tArgs) +: axiomArguments) === qi))
+                                , Seq(Trigger(App(inv, PHeapPredicateLoc(pred, tArgs) +: axiomArguments)))
+                                , "leftInverse")
+        (inv, leftInverse)
+      })
 
-      val rs = tArgs.map(x => Var(identifierFactory.fresh("r"), x.sort))
-      val tCondr = tCond.replace(qi, App(inv,rs ++ axiomArguments))
-      val tPermr = tPerm.replace(qi, App(inv,rs ++ axiomArguments))
-      val tRcvr = tArgs.map(_.replace(qi, App(inv,rs ++ axiomArguments)))
-      val rightInverse = Forall( rs ++ axiomArguments
-                              , Implies(And(tCondr, Greater(tPermr, Zero)), And(tRcvr.zip(rs).map({ case (x,y) => x === y})))
-                              , Seq(Trigger(App(inv,rs ++ axiomArguments)))
+      // There is only one right-inverse axiom
+      val r = Var(identifierFactory.fresh("l"), sorts.Loc)
+      val qsAsInvs = invs.map({ case (inv,_) => App(inv,r +: axiomArguments) })
+      val tCondr = tCond.replace(qs, qsAsInvs)
+      val tPermr = tPerm.replace(qs, qsAsInvs)
+      val tRcvr = PHeapPredicateLoc(pred, tArgs).replace(qs, qsAsInvs)
+
+      val rightInverse = Forall( r +: axiomArguments
+                              , Implies(And(tCondr, Greater(tPermr, Zero)), tRcvr === r)
+                              , Seq(Trigger(qsAsInvs))
                               , "rightInverse")
 
-      Map(node.getPrettyMetadata._1 -> (inv, Seq(leftInverse, rightInverse)))
+      Map(node.getPrettyMetadata._1 -> ((rightInverse +: invs.map(_._2), toMap[Var, Fun](qs.zip(invs.map(_._1))))))
     }
 
     case _ => Map.empty
@@ -308,7 +316,7 @@ class FunctionData(val programFunction: ast.Function,
       Map(f -> (x => And(x === tRcv, Greater(tp, NoPerm()))))
     }
     case n@QuantifiedPermissionAssertion(forall, cond, ast.FieldAccessPredicate(ast.FieldAccess(rcv: ast.Exp, f: ast.Field), p: ast.Exp)) => {
-      val (inv, invAx) = qpInversesMap(n.getPrettyMetadata._1)
+      val invs = qpInversesMap(n.getPrettyMetadata._1)._2
       val notWildcardPerm: ast.Exp = p match {
         case _:ast.WildcardPerm => ast.FullPerm()()
         case p => p
@@ -316,8 +324,8 @@ class FunctionData(val programFunction: ast.Function,
       val proxyFa = ast.Forall(forall.variables, Seq(), ast.And(cond, ast.GtCmp(notWildcardPerm, ast.IntLit(0)())())())()
       val Seq(tFa) = expressionTranslator.translatePrecondition(program, Seq(proxyFa), this)
       
-      val i = tFa.asInstanceOf[Quantification].vars.head
-      Map(f -> (r => tFa.asInstanceOf[Quantification].body.replace(i, App(inv, r +: axiomArguments))))
+      val is = tFa.asInstanceOf[Quantification].vars
+      Map(f -> (r => is.foldLeft(tFa.asInstanceOf[Quantification].body)((body, i) => body.replace(i, App(invs(i), r +: axiomArguments)))))
     }
     case n@QuantifiedPermissionAssertion(forall, cond, _: ast.PredicateAccessPredicate) =>
       toMap(program.fields.zip(Seq.fill(program.fields.length){(_:Term) => False()}))
@@ -353,7 +361,7 @@ class FunctionData(val programFunction: ast.Function,
       val tp = expressionTranslator.translatePrecondition(program, Seq(p), this).head
 
       Map(program.findPredicate(pred) -> (x => {
-        And(Greater(tp, NoPerm()) +: tArgs.zipWithIndex.map({ case (a,i) => a === PHeapPredicateLocInv(pred,i,a.sort,x)}))
+        And(Greater(tp, NoPerm()), PHeapPredicateLoc(pred, tArgs) === x)
       }))
     }
     case ast.MagicWand(lhs: ast.Exp, rhs: ast.Exp) =>
@@ -368,16 +376,17 @@ class FunctionData(val programFunction: ast.Function,
       toMap(program.predicates.zip(Seq.fill(program.predicates.length){(_:Term) => False()}))
 
     case n@QuantifiedPermissionAssertion(forall, cond, ast.PredicateAccessPredicate(ast.PredicateAccess(args, pred), p: ast.Exp)) => {
-      val (inv, invAx) = qpInversesMap(n.getPrettyMetadata._1)
+      val invs = qpInversesMap(n.getPrettyMetadata._1)._2
+
       val notWildcardPerm: ast.Exp = p match {
         case _:ast.WildcardPerm => ast.FullPerm()()
         case p => p
       }
       val proxyFa = ast.Forall(forall.variables, Seq(), ast.And(cond, ast.GtCmp(notWildcardPerm, ast.IntLit(0)())())())()
       val Seq(tFa) = expressionTranslator.translatePrecondition(program, Seq(proxyFa), this)
-     
-      val i = tFa.asInstanceOf[Quantification].vars.head
-      Map(program.findPredicate(pred) -> ((l: Term) => tFa.asInstanceOf[Quantification].body.replace(i, App(inv, args.zipWithIndex.map({ case (a,i) => PHeapPredicateLocInv(pred, i, symbolConverter.toSort(a.typ), l)}) ++ axiomArguments))))
+      
+      val is = tFa.asInstanceOf[Quantification].vars
+      Map(program.findPredicate(pred) -> (l => is.foldLeft(tFa.asInstanceOf[Quantification].body)((body, i) => body.replace(i, App(invs(i), l +: axiomArguments)))))
     }
 
     case ast.CondExp(cond,e1,e2) =>
