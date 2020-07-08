@@ -112,6 +112,8 @@ if __name__ == "__main__":
     config = parser.parse_args()
 
     config.TESTCLASS = 'FrontendGeneratedTests'
+    config.BASE = config.BASE[0]
+    config.CMP = config.CMP[0]
 
     config.BASECSV = config.BASE.replace("/", "_") + ".csv"
     config.CMPCSV = config.CMP.replace("/", "_") + ".csv"
