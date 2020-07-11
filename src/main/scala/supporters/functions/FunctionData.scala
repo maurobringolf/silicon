@@ -548,7 +548,7 @@ class FunctionData(val programFunction: ast.Function,
       /* TODO: Don't use translatePrecondition - refactor expressionTranslator */
       val tArgs = expressionTranslator.translatePrecondition(program, predAcc.args, this)
       val args = (
-        PHeapLookupPredicate(predAcc.predicateName, predef.`?h`, tArgs)
+        PHeapLookupPredicate(predAcc.predicateName, functionSupporter.axiomSnapshotVariable, tArgs)
       +: tArgs)
 
       val fapp = App(triggerFunction, args)
@@ -570,6 +570,6 @@ class FunctionData(val programFunction: ast.Function,
            Seq(Trigger(functionApplication))
         ++ predicateTriggers.values.map(pt => Trigger(Seq(triggerFunctionApplication, pt))))
 
-      Forall(arguments, body, allTriggers, s"definitionalAxiom [${function.id.name}]")})
+      Forall(axiomArguments, body, allTriggers, s"definitionalAxiom [${function.id.name}]")})
   }
 }
