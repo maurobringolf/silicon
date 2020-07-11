@@ -99,8 +99,8 @@ class FunctionData(val programFunction: ast.Function,
   // TODO: Use Resource ast type instead of general K type parameter
   // Maps a resource to a Boolean term parametrized by the receiver
   // e.g. If field f maps to function g, then g(x):Bool is a Term describing the condition under
-  // which x:Ref is in the f-domain.
-  type DomMap[K] = Map[K, Term => Term]
+  // which (x:Ref) is in the f-domain of the function.
+  type DomMap = Map[ast.Resource, Term => Term]
 
   def translatePreconditionToDomain(pre: ast.Exp): Option[Term] = pre match {
     case ast.PredicateAccessPredicate(ast.PredicateAccess(args, pred), p) =>
@@ -111,8 +111,6 @@ class FunctionData(val programFunction: ast.Function,
           val tp = expressionTranslator.translatePrecondition(program, Seq(p), this).head
           Greater(tp, NoPerm())
       }
-      // TODO: What about unfoldings? I don't think that "h" is always correct here.
-      // It should probably have recursion over the snapshot like the translate() method for the body.
       Some(Ite( tCond
               , PHeapSingletonPredicate(pred, tArgs, PHeapLookupPredicate(pred, functionSupporter.axiomSnapshotVariable , tArgs))
               , predef.Emp
@@ -130,8 +128,13 @@ class FunctionData(val programFunction: ast.Function,
           val tp = expressionTranslator.translatePrecondition(program, Seq(p), this).head
           Greater(tp, NoPerm())
       }
-      // TODO: What about unfoldings? I don't think that "h" is always correct here.
-      // It should probably have recursion over the snapshot like the translate() method for the body.
+      /**
+       * [2020-07-11 Mauro]
+       *
+       * Note that unfoldings are irrelevant in this case and we can always use PHeapLookupField of the snapshot passed to the function,
+       * because impure expressions under unfoldings are disallowed.
+       *
+       **/
       Some(Ite( tCond
               , PHeapSingletonField(f.name,tx, PHeapLookupField(f.name, symbolConverter.toSort(f.typ), functionSupporter.axiomSnapshotVariable , tx))
               , predef.Emp
@@ -168,46 +171,37 @@ class FunctionData(val programFunction: ast.Function,
     } else {
       val pre = if (programFunction.pres.isEmpty) ast.BoolLit(true)() else programFunction.pres.reduce((p1,p2) => ast.And(p1,p2)())
 
-      // TODO: This merging of all false with actual domains is not very elegant, this should be built into the function
+      val domMap = getDomMap(pre)
 
-      val emptyFieldDoms = toMap(program.fields.zip(Seq.fill(program.fields.length){(_:Term) => False()}))
-      val actualFieldDoms : DomMap[ast.Field] = getFieldDoms(pre)
-      val fieldDoms = mergeDoms(emptyFieldDoms, actualFieldDoms)
-      
-      val emptyPredDoms = toMap(program.predicates.zip(Seq.fill(program.predicates.length){(_:Term) => False()}))
-      val actualPredDoms : DomMap[ast.Predicate] = getPredDoms(pre)
+      domMap.iterator.map({
+        case (p: ast.Predicate, dom: (Term => Term)) => {
+          val pArgs = p.formalArgs.map(x => Var(identifierFactory.fresh(x.name), symbolConverter.toSort(x.typ)))
+          val x = Var(identifierFactory.fresh("loc"), sorts.Loc)
 
-      val predDoms = mergeDoms(emptyPredDoms, actualPredDoms)
+          Forall( axiomArguments
+                , Forall( Seq(x)
+                        , And( Iff(SetIn(x, PHeapPredicateDomain(p.name, restrictHeapApplication)), dom(x))
+                             , Implies(SetIn(x, PHeapPredicateDomain(p.name, restrictHeapApplication)), PHeapLookupPredicate(p.name, restrictHeapApplication, Seq(x)) === PHeapLookupPredicate(p.name, axiomArguments.head, Seq(x))))
+                        , Seq( Trigger(SetIn(x, PHeapPredicateDomain(p.name, restrictHeapApplication)))
+                            , Trigger(PHeapLookupPredicate(p.name, restrictHeapApplication, Seq(x)))))
+                , Seq(Trigger(restrictHeapApplication))
+                , s"restrictHeapAxiom_dom_${p.name}[${function.id.name}]")
+        }
+        case (ast.Field(name, typ), dom: (Term => Term)) => {
+          val x = Var(identifierFactory.fresh("x"), sorts.Ref)
+          val fSort = symbolConverter.toSort(typ)
 
-      val d1 = predDoms.iterator.map({ case (p, dom) => {
-        val pArgs = p.formalArgs.map(x => Var(identifierFactory.fresh(x.name), symbolConverter.toSort(x.typ)))
-        val x = Var(identifierFactory.fresh("loc"), sorts.Loc)
-
-        Forall( axiomArguments
-              , Forall( Seq(x)
-                      , And( Iff(SetIn(x, PHeapPredicateDomain(p.name, restrictHeapApplication)), dom(x))
-                           , Implies(SetIn(x, PHeapPredicateDomain(p.name, restrictHeapApplication)), PHeapLookupPredicate(p.name, restrictHeapApplication, Seq(x)) === PHeapLookupPredicate(p.name, axiomArguments.head, Seq(x))))
-                      , Seq( Trigger(SetIn(x, PHeapPredicateDomain(p.name, restrictHeapApplication)))
-                          , Trigger(PHeapLookupPredicate(p.name, restrictHeapApplication, Seq(x)))))
-              , Seq(Trigger(restrictHeapApplication))
-              , s"restrictHeapAxiom_dom_${p.name}[${function.id.name}]")
-      }}).foldLeft[Term](True())((d1,d2) => And(d1,d2))
-
-      val d2 = fieldDoms.iterator.map({ case (ast.Field(name, typ), dom) => {
-        val x = Var(identifierFactory.fresh("x"), sorts.Ref)
-        val fSort = symbolConverter.toSort(typ)
-
-        Forall( axiomArguments
-              , Forall( Seq(x)
-                      , And( Iff(SetIn(x, PHeapFieldDomain(name, restrictHeapApplication)), dom(x))
-                          , PHeapLookupField(name, fSort, restrictHeapApplication, x) === PHeapLookupField(name, fSort, axiomArguments.head, x))
-                      , Seq( Trigger(PHeapLookupField(name, fSort, restrictHeapApplication, x))
-                          , Trigger(SetIn(x, PHeapFieldDomain(name, restrictHeapApplication)))))
-              , Seq(Trigger(restrictHeapApplication))
-              , s"restrictHeapAxiom_dom_${name}[${function.id.name}]")
-      }}).foldLeft[Term](True())((d1,d2) => And(d1,d2))
-
-      return And(d1, d2)
+          Forall( axiomArguments
+                , Forall( Seq(x)
+                        , And( Iff(SetIn(x, PHeapFieldDomain(name, restrictHeapApplication)), dom(x))
+                            , PHeapLookupField(name, fSort, restrictHeapApplication, x) === PHeapLookupField(name, fSort, axiomArguments.head, x))
+                        , Seq( Trigger(PHeapLookupField(name, fSort, restrictHeapApplication, x))
+                            , Trigger(SetIn(x, PHeapFieldDomain(name, restrictHeapApplication)))))
+                , Seq(Trigger(restrictHeapApplication))
+                , s"restrictHeapAxiom_dom_${name}[${function.id.name}]")
+        }
+        case r => sys.error("Unexpected resource " ++ r.toString)
+      }).foldLeft[Term](True())((d1,d2) => And(d1,d2))
     }
   }
 
@@ -309,110 +303,92 @@ class FunctionData(val programFunction: ast.Function,
     case _ => Map.empty
   }
 
-  def mergeDoms[K](fd1: DomMap[K] , fd2: DomMap[K], merger: (Term, Term) => Term = Or(_,_)) : DomMap[K] = {
-    val fs = fd1.keySet ++ fd2.keySet
-    toMap(fs.map(k => (k, ((x:Term) => merger(
-      fd1.getOrElse(k, (_:Term) => False())(x),
-      fd2.getOrElse(k, (_:Term) => False())(x),
-    )))))
-  }
 
-  def getFieldDoms(pre: ast.Exp) : DomMap[ast.Field] = pre match {
-    case ast.And(e1,e2) => mergeDoms(getFieldDoms(e1), getFieldDoms(e2))
-    case ast.FieldAccessPredicate(ast.FieldAccess(rcv: ast.Exp, f: ast.Field), p) => {
-      val Seq(tRcv, tp) = expressionTranslator.translatePrecondition(program, Seq(rcv, p), this)
-      Map(f -> (x => And(x === tRcv, Greater(tp, NoPerm()))))
+  def getDomMap(pre: ast.Exp) : DomMap = {
+    def mergeDoms(fd1: DomMap , fd2: DomMap, merger: (Term, Term) => Term = Or(_,_)) : DomMap = {
+      val fs = fd1.keySet ++ fd2.keySet
+      toMap(fs.map(k => (k, ((x:Term) => merger(
+        fd1.getOrElse(k, (_:Term) => False())(x),
+        fd2.getOrElse(k, (_:Term) => False())(x),
+      )))))
     }
-    case n@QuantifiedPermissionAssertion(forall, cond, ast.FieldAccessPredicate(ast.FieldAccess(rcv: ast.Exp, f: ast.Field), p: ast.Exp)) => {
-      val invs = qpInversesMap(n.getPrettyMetadata._1)._2
-      val notWildcardPerm: ast.Exp = p match {
-        case _:ast.WildcardPerm => ast.FullPerm()()
-        case p => p
-      }
-      val proxyFa = ast.Forall(forall.variables, Seq(), ast.And(cond, ast.GtCmp(notWildcardPerm, ast.IntLit(0)())())())()
-      val Seq(tFa) = expressionTranslator.translatePrecondition(program, Seq(proxyFa), this)
+
+    // Takes an existing DomMap and extends it to include 'a'
+    def go(a: ast.Exp, dm: DomMap) : DomMap = a match {
       
-      val is = tFa.asInstanceOf[Quantification].vars
-      Map(f -> (r => is.foldLeft(tFa.asInstanceOf[Quantification].body)((body, i) => body.replace(i, App(invs(i), r +: axiomArguments)))))
-    }
-    case n@QuantifiedPermissionAssertion(forall, cond, _: ast.PredicateAccessPredicate) =>
-      toMap(program.fields.zip(Seq.fill(program.fields.length){(_:Term) => False()}))
-    case ast.PredicateAccessPredicate(_, _) =>
-      toMap(program.fields.zip(Seq.fill(program.fields.length){(_:Term) => False()}))
-    case ast.CondExp(cond,e1,e2) =>
-      val tCond = expressionTranslator.translatePrecondition(program, Seq(cond), this).head
-      val e1Dom = getFieldDoms(e1)
-      val e2Dom = getFieldDoms(e2)
-      mergeDoms(e1Dom, e2Dom, Ite(tCond, _, _))
-    case ast.Implies(prem, conc) =>
-      val tCond = expressionTranslator.translatePrecondition(program, Seq(prem), this).head
-      val concDom = getFieldDoms(conc)
-      mergeDoms( concDom
-               , toMap(program.fields.zip(Seq.fill(program.fields.length){(_:Term) => False()}))
-               , Ite(tCond, _, _))
-    case ast.MagicWand(lhs: ast.Exp, rhs: ast.Exp) =>
-      val lhsDom = getFieldDoms(lhs)
-      val rhsDom = getFieldDoms(rhs)
-      mergeDoms( rhsDom
-               , lhsDom
-               , (d1, d2) => And(d1, Not(d2)))
-    case a => if (a.isPure)
-                toMap(program.fields.zip(Seq.fill(program.fields.length){(_:Term) => False()}))
-              else
-                sys.error("Cannot getFieldDoms() of " + a.toString)
-  }
-
-  def getPredDoms(pre: ast.Exp): DomMap[ast.Predicate] = pre match {
-    case ast.And(e1, e2) => mergeDoms(getPredDoms(e1), getPredDoms(e2))
-    case ast.PredicateAccessPredicate(ast.PredicateAccess(args, pred), p) => {
-      val tArgs = expressionTranslator.translatePrecondition(program, args, this)
-      val tp = expressionTranslator.translatePrecondition(program, Seq(p), this).head
-
-      Map(program.findPredicate(pred) -> (x => {
-        And(Greater(tp, NoPerm()), PHeapPredicateLoc(pred, tArgs) === x)
-      }))
-    }
-    case ast.MagicWand(lhs: ast.Exp, rhs: ast.Exp) =>
-      val lhsDom = getPredDoms(lhs)
-      val rhsDom = getPredDoms(rhs)
-      mergeDoms( rhsDom
-               , lhsDom
-               , (d1, d2) => And(d1, Not(d2)))
-    case ast.FieldAccessPredicate(_, _) =>
-      toMap(program.predicates.zip(Seq.fill(program.predicates.length){(_:Term) => False()}))
-    case QuantifiedPermissionAssertion(_, _, ast.FieldAccessPredicate(_,_)) => 
-      toMap(program.predicates.zip(Seq.fill(program.predicates.length){(_:Term) => False()}))
-
-    case n@QuantifiedPermissionAssertion(forall, cond, ast.PredicateAccessPredicate(ast.PredicateAccess(args, pred), p: ast.Exp)) => {
-      val invs = qpInversesMap(n.getPrettyMetadata._1)._2
-
-      val notWildcardPerm: ast.Exp = p match {
-        case _:ast.WildcardPerm => ast.FullPerm()()
-        case p => p
+      // Single resource access
+      case ast.FieldAccessPredicate(ast.FieldAccess(rcv: ast.Exp, f: ast.Field), p) => {
+        val Seq(tRcv, tp) = expressionTranslator.translatePrecondition(program, Seq(rcv, p), this)
+        Map(f -> (x => And(x === tRcv, Greater(tp, NoPerm()))))
       }
-      val proxyFa = ast.Forall(forall.variables, Seq(), ast.And(cond, ast.GtCmp(notWildcardPerm, ast.IntLit(0)())())())()
-      val Seq(tFa) = expressionTranslator.translatePrecondition(program, Seq(proxyFa), this)
-      
-      val is = tFa.asInstanceOf[Quantification].vars
-      Map(program.findPredicate(pred) -> (l => is.foldLeft(tFa.asInstanceOf[Quantification].body)((body, i) => body.replace(i, App(invs(i), l +: axiomArguments)))))
+      case ast.PredicateAccessPredicate(ast.PredicateAccess(args, pred), p) => {
+        val tArgs = expressionTranslator.translatePrecondition(program, args, this)
+        val tp = expressionTranslator.translatePrecondition(program, Seq(p), this).head
+
+        Map(program.findPredicate(pred) -> (x => {
+          And(Greater(tp, NoPerm()), PHeapPredicateLoc(pred, tArgs) === x)
+        }))
+      }
+      /** TODO
+      case ast.MagicWand => {
+
+      }
+      */
+
+      // Quantified resource access
+      case n@QuantifiedPermissionAssertion(forall, cond, ast.FieldAccessPredicate(ast.FieldAccess(rcv: ast.Exp, f: ast.Field), p: ast.Exp)) => {
+        val invs = qpInversesMap(n.getPrettyMetadata._1)._2
+        val notWildcardPerm: ast.Exp = p match {
+          case _:ast.WildcardPerm => ast.FullPerm()()
+          case p => p
+        }
+        val proxyFa = ast.Forall(forall.variables, Seq(), ast.And(cond, ast.GtCmp(notWildcardPerm, ast.IntLit(0)())())())()
+        val Seq(tFa) = expressionTranslator.translatePrecondition(program, Seq(proxyFa), this)
+        
+        val is = tFa.asInstanceOf[Quantification].vars
+        Map(f -> (r => is.foldLeft(tFa.asInstanceOf[Quantification].body)((body, i) => body.replace(i, App(invs(i), r +: axiomArguments)))))
+      }
+      case n@QuantifiedPermissionAssertion(forall, cond, ast.PredicateAccessPredicate(ast.PredicateAccess(args, pred), p: ast.Exp)) => {
+        val invs = qpInversesMap(n.getPrettyMetadata._1)._2
+
+        val notWildcardPerm: ast.Exp = p match {
+          case _:ast.WildcardPerm => ast.FullPerm()()
+          case p => p
+        }
+        val proxyFa = ast.Forall(forall.variables, Seq(), ast.And(cond, ast.GtCmp(notWildcardPerm, ast.IntLit(0)())())())()
+        val Seq(tFa) = expressionTranslator.translatePrecondition(program, Seq(proxyFa), this)
+        
+        val is = tFa.asInstanceOf[Quantification].vars
+        Map(program.findPredicate(pred) -> (l => is.foldLeft(tFa.asInstanceOf[Quantification].body)((body, i) => body.replace(i, App(invs(i), l +: axiomArguments)))))
+      }
+
+      // Combined assertions that allow pure sub assertions
+      case ast.And(e1,e2) => mergeDoms(go(e1, dm), go(e2, dm))
+      case ast.CondExp(cond,e1,e2) =>
+        val tCond = expressionTranslator.translatePrecondition(program, Seq(cond), this).head
+        val e1Dom = getDomMap(e1)
+        val e2Dom = getDomMap(e2)
+        mergeDoms(dm, mergeDoms(e1Dom, e2Dom, Ite(tCond, _, _)))
+      case ast.Implies(e1, e2) =>
+        val tE1 = expressionTranslator.translatePrecondition(program, Seq(e1), this).head
+        val e2Dom = getDomMap(e2)
+        mergeDoms(dm, mergeDoms(e2Dom, Map.empty, Ite(tE1, _, _)))
+      /** TODO
+      case ast.InhaleExhaleExp(e1, e2) => {
+
+      }
+      */
+
+      // Any other assertion should be pure
+      case a => if (a.isPure)
+                  Map.empty
+                else
+                  sys.error("Cannot getDomMap() of " + a.toString)
     }
 
-    case ast.CondExp(cond,e1,e2) =>
-      val tCond = expressionTranslator.translatePrecondition(program, Seq(cond), this).head
-      val e1Dom = getPredDoms(e1)
-      val e2Dom = getPredDoms(e2)
-      mergeDoms(e1Dom, e2Dom, Ite(tCond, _, _))
-    case ast.Implies(prem, conc) =>
-      val tCond = expressionTranslator.translatePrecondition(program, Seq(prem), this).head
-      val concDom = getPredDoms(conc)
-      mergeDoms( concDom
-               , toMap(program.predicates.zip(Seq.fill(program.predicates.length){(_:Term) => False()}))
-               , Ite(tCond, _, _))
-
-    case a => if (a.isPure)
-                toMap(program.predicates.zip(Seq.fill(program.predicates.length){(_:Term) => False()}))
-              else
-                sys.error("Cannot getPredDoms() of " + a.toString)
+    val emptyDomMap : Map[ast.Resource, Term => Term] = toMap( program.fields.zip(Seq.fill(program.fields.length){(_:Term) => False()})
+                          ++ program.predicates.zip(Seq.fill(program.predicates.length){(_:Term) => False()}))
+    go(pre, emptyDomMap)
   }
 
   /*
