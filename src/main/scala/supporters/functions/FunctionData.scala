@@ -167,9 +167,17 @@ class FunctionData(val programFunction: ast.Function,
       return Forall(axiomArguments, restrictHeapApplication === dom, Trigger(restrictHeapApplication), s"restrictHeapAxiom [${function.id.name}]")
     } else {
       val pre = if (programFunction.pres.isEmpty) ast.BoolLit(true)() else programFunction.pres.reduce((p1,p2) => ast.And(p1,p2)())
-      val fieldDoms : DomMap[ast.Field] = getFieldDoms(pre)
 
-      val predDoms : DomMap[ast.Predicate] = getPredDoms(pre)
+      // TODO: This merging of all false with actual domains is not very elegant, this should be built into the function
+
+      val emptyFieldDoms = toMap(program.fields.zip(Seq.fill(program.fields.length){(_:Term) => False()}))
+      val actualFieldDoms : DomMap[ast.Field] = getFieldDoms(pre)
+      val fieldDoms = mergeDoms(emptyFieldDoms, actualFieldDoms)
+      
+      val emptyPredDoms = toMap(program.predicates.zip(Seq.fill(program.predicates.length){(_:Term) => False()}))
+      val actualPredDoms : DomMap[ast.Predicate] = getPredDoms(pre)
+
+      val predDoms = mergeDoms(emptyPredDoms, actualPredDoms)
 
       val d1 = predDoms.iterator.map({ case (p, dom) => {
         val pArgs = p.formalArgs.map(x => Var(identifierFactory.fresh(x.name), symbolConverter.toSort(x.typ)))
