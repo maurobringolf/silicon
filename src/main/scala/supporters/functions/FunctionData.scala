@@ -346,7 +346,7 @@ class FunctionData(val programFunction: ast.Function,
         val Seq(tFa) = expressionTranslator.translatePrecondition(program, Seq(proxyFa), this)
         
         val is = tFa.asInstanceOf[Quantification].vars
-        Map(f -> (r => is.foldLeft(tFa.asInstanceOf[Quantification].body)((body, i) => body.replace(i, App(invs(i), r +: axiomArguments)))))
+        mergeDoms(dm, Map(f -> (r => is.foldLeft(tFa.asInstanceOf[Quantification].body)((body, i) => body.replace(i, App(invs(i), r +: axiomArguments))))))
       }
       case n@QuantifiedPermissionAssertion(forall, cond, ast.PredicateAccessPredicate(ast.PredicateAccess(args, pred), p: ast.Exp)) => {
         val invs = qpInversesMap(n.getPrettyMetadata._1)._2
@@ -359,7 +359,7 @@ class FunctionData(val programFunction: ast.Function,
         val Seq(tFa) = expressionTranslator.translatePrecondition(program, Seq(proxyFa), this)
         
         val is = tFa.asInstanceOf[Quantification].vars
-        Map(program.findPredicate(pred) -> (l => is.foldLeft(tFa.asInstanceOf[Quantification].body)((body, i) => body.replace(i, App(invs(i), l +: axiomArguments)))))
+        mergeDoms(dm, Map(program.findPredicate(pred) -> (l => is.foldLeft(tFa.asInstanceOf[Quantification].body)((body, i) => body.replace(i, App(invs(i), l +: axiomArguments))))))
       }
 
       // Combined assertions that allow pure sub assertions
