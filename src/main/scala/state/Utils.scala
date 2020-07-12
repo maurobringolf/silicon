@@ -12,11 +12,6 @@ import viper.silicon.verifier.Verifier
 
 package object utils {
 
-  def freshQuantifierSafe(s: State, v: Verifier, resultSort: Sort) : Term = s.quantifiedVariables match {
-    case Seq() => v.decider.fresh(resultSort)
-    case xs => App(v.decider.fresh("quantifiedFresh", xs.map(_.sort), sorts.PHeap), xs)
-  }
-
   // Applies a simple search-and-replace strategy to project heap dependencies of a trigger to quantified variables
   // Splits the quantifier per trigger
   def makeTriggersHeapIndependent(q : Quantification, fresh: (String, Sort) => Var) : Seq[Quantification] = {
