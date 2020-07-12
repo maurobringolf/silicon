@@ -169,6 +169,7 @@ trait DefaultFunctionVerificationUnitProvider extends VerifierComponent { v: Ver
 
         case (result1, phase1data) =>
           emitAndRecordFunctionAxioms(data.limitedAxiom)
+          emitAndRecordFunctionAxioms(data.framingAxiom)
           emitAndRecordFunctionAxioms(data.triggerAxiom)
           emitAndRecordFunctionAxioms(data.restrictHeapAxiom)
           emitAndRecordFunctionAxioms(data.postAxiom.toSeq: _*)

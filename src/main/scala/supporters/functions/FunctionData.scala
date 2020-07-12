@@ -83,13 +83,22 @@ class FunctionData(val programFunction: ast.Function,
 
   val functionApplication = App(function, axiomArguments)
   val restrictHeapApplication = App(restrictHeapFunction, axiomArguments)
-  val restrictedLimitedFunctionApplication = App(limitedFunction, restrictHeapApplication +: axiomFormalArgs.values.toSeq)
   val limitedFunctionApplication = App(limitedFunction, axiomArguments)
   val triggerFunctionApplication = App(statelessFunction, axiomFormalArgs.values.toSeq)
 
+  val h1 = Var(Identifier("@h1"), sorts.PHeap)
+  val h2 = Var(Identifier("@h2"), sorts.PHeap)
+
+  val framingAxiom =
+    Forall( Seq(h1, h2) ++ axiomArguments.tail
+          , Implies(PHeapEqual(App(restrictHeapFunction, h1 +: axiomArguments.tail), App(restrictHeapFunction, h2 +: axiomArguments.tail)), App(limitedFunction, h1 +: axiomArguments.tail) === App(limitedFunction, h2 +: axiomArguments.tail))
+          , Seq(Trigger(Seq(App(limitedFunction, h1 +: axiomArguments.tail), App(limitedFunction, h2 +: axiomArguments.tail))))
+          , s"framingAxiom [${function.id.name}]"
+          )
+
   val limitedAxiom =
     Forall(axiomArguments,
-           restrictedLimitedFunctionApplication === functionApplication,
+           limitedFunctionApplication === functionApplication,
            Trigger(functionApplication),
            s"limitedAxiom [${function.id.name}]")
 

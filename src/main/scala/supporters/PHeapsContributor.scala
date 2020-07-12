@@ -98,7 +98,8 @@ class DefaultPHeapsContributor(preambleReader: PreambleReader[String, String],
     astDecls =
       predicate_loc_inv_func_decls(program.predicates)
     astAxioms =
-      framing_functions(program.predicates, program.fields, program.functions) ++ extensional_equality(program.predicates, program.fields, program.functions) ++
+      //framing_functions(program.predicates, program.fields, program.functions) ++
+      extensional_equality(program.predicates, program.fields, program.functions) ++
       predicate_loc_inv_func_axioms(program.predicates)
   }
 
