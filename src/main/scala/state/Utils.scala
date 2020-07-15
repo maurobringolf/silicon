@@ -42,8 +42,20 @@ package object utils {
       // For each trigger, create a new quantifier where all heap dependencies are replaced with the new variables
       .map({ case (ts, m) => Quantification(q.q,
               q.vars ++ m.values.toSeq,
-              // TODO: This would be the premised version which narrows down all projected terms back to their original values (untested)
-              // Implies( And(m.map({ case (t,p) => t === p})), q.body )
+
+              /**
+               * [2020-07-15 Mauro]
+               *
+               * This would be the premised version which narrows down all projected terms back to their original values (untested):
+               
+                 Implies( And(m.map({ case (t,p) => t === p})), q.body )
+
+               * This could be needed to restore the original triggering behavior on the Viper level,
+               * i.e. how user-provided, heap-dependent triggers behave.
+               * Soundness should not be affected by this since it can only result in less obtained equalities.
+               * Performance is probably not affected significantly either, since the quantifier can still be instantiated with an arbitrary term.
+               **/
+
               q.body,
               Seq(Trigger(ts.map(replaceHeapDeps(_,m)))), 
               q.name,
