@@ -35,7 +35,6 @@ class TermToSMTLib2Converter
     case sorts.Int => "Int"
     case sorts.Loc => "Loc"
     case sorts.PHeap => "PHeap"
-    case sorts.PHeapLambda => "PHeapLambda"
     case sorts.Bool => "Bool"
     case sorts.Perm => "$Perm"
     case sorts.Snap => "$Snap"

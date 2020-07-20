@@ -105,7 +105,8 @@ class DefaultPHeapsContributor(preambleReader: PreambleReader[String, String],
       generatePHeapFunctions ++
       generateFieldFunctionDecls(program.fields) ++
       generatePredicateFunctionDecls(program.predicates) ++
-      generateMagicWandFunctionDecls(program)
+      generateMagicWandFunctionDecls(program) ++
+      magicwand_field_axioms(program)
     collectedAxioms =
       field_lookup_combine(program.fields) ++ 
       field_dom_combine(program.fields) ++
@@ -170,6 +171,21 @@ class DefaultPHeapsContributor(preambleReader: PreambleReader[String, String],
       val declarations = preambleReader.readParametricPreamble(templateFile, subs)
       (s"$templateFile [${subs("$MW$")}]", declarations)
     })
+  }
+
+  def magicwand_field_axioms(program: ast.Program) : Iterable[PreambleBlock] = {
+    val templateFile = "/pheap/magicwand_field_axioms.smt2"
+
+    val wands = program.magicWandStructures
+
+    wands flatMap (mw => {
+      val subs = magicWandSubstitutions(mw, program)
+      program.fields map (f => {
+        val declarations = preambleReader.readParametricPreamble(templateFile, fieldSubstitutions(f) ++ subs)
+        (s"wand_field_axioms (${subs("$MW$")}, ${f.name})", declarations)
+      })
+    })
+
   }
 
   def pred_lookup_combine(predicates: Seq[ast.Predicate]): Iterable[PreambleBlock] = {
@@ -367,7 +383,7 @@ class DefaultPHeapsContributor(preambleReader: PreambleReader[String, String],
   def sortsAfterAnalysis: InsertionOrderedSet[sorts.FieldValueFunction] = InsertionOrderedSet.empty
 
   def declareSortsAfterAnalysis(sink: ProverLike): Unit = {
-    Seq(sorts.PHeap, sorts.Loc, sorts.PHeapLambda) foreach (s => sink.declare(SortDecl(s)))
+    Seq(sorts.PHeap, sorts.Loc) foreach (s => sink.declare(SortDecl(s)))
   }
 
   val symbolsAfterAnalysis: Iterable[String] =

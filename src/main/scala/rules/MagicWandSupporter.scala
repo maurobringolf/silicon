@@ -86,7 +86,7 @@ object magicWandSupporter extends SymbolicExecutionRules with Immutable {
                   v: Verifier)
                   (Q: (State, MagicWandChunk, Verifier) => VerificationResult)
                   : VerificationResult =
-    createChunk(s, wand, v.decider.fresh(sorts.PHeapLambda), None, pve, v)(Q)
+    createChunk(s, wand, v.decider.fresh(sorts.PHeap), None, pve, v)(Q)
 
   def createChunk(s: State,
                   wand: ast.MagicWand,
@@ -298,15 +298,17 @@ object magicWandSupporter extends SymbolicExecutionRules with Immutable {
           Success()
         })
       } else {
-        val wLambda = v.decider.fresh("lambda", sorts.PHeapLambda)
+        val wLambda = v.decider.fresh("lambda", sorts.PHeap)
 
         // Generalize, declare and define symbols potentially used in definition of wLambda
         val declsToGeneralizedDecls: Map[Fun, Fun] = toMap(additionalDeclarations.collect({
           case FunctionDecl(f@Fun(_,_,_)) => {
-            // TODO: Is this naming scheme safe?
+            (f, Fun(v.identifierFactory.fresh(f.id.name + "_generalized"), sorts.PHeap +: f.argSorts, f.resultSort))
+
+            /* This resulted in some duplicate declarations
             (f, f.copy( id = Identifier(f.id.name + "_generalized")
                       , argSorts = sorts.PHeap +: f.argSorts))
-            //(f, Fun(Identifier(f"generalized_${id.name}"), sorts.PHeap +: argSorts, resultSort))
+            */
           }
         }))
 
