@@ -35,6 +35,7 @@ class TermToSMTLib2Converter
     case sorts.Int => "Int"
     case sorts.Loc => "Loc"
     case sorts.PHeap => "PHeap"
+    case sorts.PHeapLambda => "PHeapLambda"
     case sorts.Bool => "Bool"
     case sorts.Perm => "$Perm"
     case sorts.Snap => "$Snap"
@@ -215,12 +216,10 @@ class TermToSMTLib2Converter
 
     /* PHeaps */
 
+    case PHeapLambdaApply(l,h) => parens(text("PHeap.applyLambda") <+> render(l) <+> render(h))
+    case PHeapLookupMagicWand(mw,h,args) => parens(text("PHeap.lookup_") <> mw <+> render(h) <+> parens(text("PHeap.MWloc_") <> mw <+> args.map(a => convert(a)).mkString(" ")))
+    case PHeapSingletonMagicWand(mw,args,l) => parens(text("PHeap.singleton_") <> mw <+> args.map(a => convert(a)).mkString(" ") <+> render(l))
     case PHeapEqual(h1, h2) => parens(text("PHeap.equal") <+> render(h1) <+> render(h2))
-
-    //case MagicWandSnapshot(abstractLhs, rhsSnapshot) => 
-    case PHeapMWS(lhs, rhs) => parens(text("PHeap.MWS") <+> render(lhs) <+> render(rhs))
-    case PHeapLHS(mws) => parens(text("PHeap.LHS") <+> render(mws))
-    case PHeapRHS(mws) => parens(text("PHeap.RHS") <+> render(mws))
 
     case PHeapLookupField(f, _, h, x) => parens(text("PHeap.lookup_") <> f <+> render(h) <+> render(x))
     case PHeapFieldDomain(f, h) => parens(text("PHeap.dom_") <> f <+> render(h))

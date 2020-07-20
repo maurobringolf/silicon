@@ -14,6 +14,7 @@ import viper.silicon.common.collections.immutable.InsertionOrderedSet
 import viper.silicon.interfaces.FatalResult
 import viper.silicon.rules.{InverseFunctions, SnapshotMapDefinition, functionSupporter}
 import viper.silicon.state.terms._
+import viper.silicon.state.MagicWandIdentifier
 import viper.silicon.state.terms.predef._
 import viper.silicon.state.{Identifier, IdentifierFactory, SymbolConverter}
 import viper.silicon.supporters.PredicateData
@@ -164,6 +165,7 @@ class FunctionData(val programFunction: ast.Function,
     })
 
     val preContainsQP = translatedDomains.exists(d => d.isEmpty)
+
 
     if (!preContainsQP) {
       val dom = if (programFunction.pres.isEmpty) predef.Emp else translatedDomains.map(_.get).reduce((h1, h2) => PHeapCombine(h1,h2))
@@ -329,11 +331,11 @@ class FunctionData(val programFunction: ast.Function,
           And(Greater(tp, NoPerm()), PHeapPredicateLoc(pred, tArgs) === x)
         }))
       }
-      /** TODO
-      case ast.MagicWand => {
-
+      case wand: ast.MagicWand => {
+        val mwid = MagicWandIdentifier(wand, program)
+        val args = wand.subexpressionsToEvaluate(program)
+        dm
       }
-      */
 
       // Quantified resource access
       case n@QuantifiedPermissionAssertion(forall, cond, ast.FieldAccessPredicate(ast.FieldAccess(rcv: ast.Exp, f: ast.Field), p: ast.Exp)) => {

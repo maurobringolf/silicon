@@ -16,6 +16,7 @@ import viper.silicon.decider.RecordedPathConditions
 import viper.silicon.interfaces._
 import viper.silicon.interfaces.state._
 import viper.silicon.state._
+import viper.silicon.state.utils.transform
 import viper.silicon.state.terms.{MagicWandSnapshot, _}
 import viper.silicon.verifier.Verifier
 
@@ -79,35 +80,29 @@ object magicWandSupporter extends SymbolicExecutionRules with Immutable {
 //    result
 //  }
 
-  //TODO: needs to calculate a snapshot that preserves values from the lhs
   def createChunk(s: State,
                   wand: ast.MagicWand,
                   pve: PartialVerificationError,
                   v: Verifier)
                   (Q: (State, MagicWandChunk, Verifier) => VerificationResult)
                   : VerificationResult =
-    createChunk(s, wand, MagicWandSnapshot(v.decider.fresh(sorts.PHeap), v.decider.fresh(sorts.PHeap)), pve, v)(Q)
+    createChunk(s, wand, v.decider.fresh(sorts.PHeapLambda), None, pve, v)(Q)
 
   def createChunk(s: State,
                   wand: ast.MagicWand,
-                  abstractLhs: Term,
-                  rhsSnapshot: Term,
-                  pve: PartialVerificationError,
-                  v: Verifier)
-                  (Q: (State, MagicWandChunk, Verifier) => VerificationResult)
-                  : VerificationResult =
-    createChunk(s, wand, MagicWandSnapshot(abstractLhs, rhsSnapshot), pve, v)(Q)
-
-  def createChunk(s: State,
-                  wand: ast.MagicWand,
-                  snap: MagicWandSnapshot,
+                  snap: Term,
+                  supportMacro: Option[Identifier],
                   pve: PartialVerificationError,
                   v: Verifier)
                  (Q: (State, MagicWandChunk, Verifier) => VerificationResult)
                  : VerificationResult = {
-    evaluateWandArguments(s, wand, pve, v)((s1, ts, v1) =>
-      Q(s1, MagicWandChunk(MagicWandIdentifier(wand, Verifier.program), s1.g.values, ts, snap, FullPerm()), v1)
-    )
+
+    evaluateWandArguments(s, wand, pve, v)((s1, tArgs, v1) => {
+      val mwid = MagicWandIdentifier(wand, Verifier.program)
+      val wandSnap = PHeapLookupMagicWand(mwid.toString, snap, tArgs)
+      v1.decider.assume(snap === PHeapSingletonMagicWand(mwid.toString, tArgs, wandSnap))
+      Q(s1, MagicWandChunk(mwid, s1.g.values, tArgs, wandSnap, supportMacro, FullPerm()), v1)
+    })
   }
 
   def evaluateWandArguments(s: State,
@@ -252,9 +247,10 @@ object magicWandSupporter extends SymbolicExecutionRules with Immutable {
     def createWandChunkAndRecordResults(s4: State,
                                         freshSnapRoot: Var,
                                         snap: Term,
+                                        additionalDeclarations: Set[Decl],
+                                        additionalAssumptions: Set[Term],
                                         v3: Verifier)
                                        : VerificationResult = {
-
       def appendToResults(s5: State, ch: Chunk, pcs: RecordedPathConditions, v4: Verifier): Unit = {
         assert(s5.conservedPcs.nonEmpty, s"Unexpected structure of s5.conservedPcs: ${s5.conservedPcs}")
 
@@ -302,10 +298,47 @@ object magicWandSupporter extends SymbolicExecutionRules with Immutable {
           Success()
         })
       } else {
-        magicWandSupporter.createChunk(s4, wand, freshSnapRoot, snap, pve, v3)((s5, ch, v4) => {
-//          say(s"done: create wand chunk: $ch")
-          appendToResults(s5, ch, v4.decider.pcs.after(preMark), v4)
-          Success()
+        val wLambda = v.decider.fresh("lambda", sorts.PHeapLambda)
+
+        // Generalize, declare and define symbols potentially used in definition of wLambda
+        val declsToGeneralizedDecls: Map[Fun, Fun] = toMap(additionalDeclarations.collect({
+          case FunctionDecl(f@Fun(_,_,_)) => {
+            // TODO: Is this naming scheme safe?
+            (f, f.copy( id = Identifier(f.id.name + "_generalized")
+                      , argSorts = sorts.PHeap +: f.argSorts))
+            //(f, Fun(Identifier(f"generalized_${id.name}"), sorts.PHeap +: argSorts, resultSort))
+          }
+        }))
+
+        val arbitrarySnapRoot = v.decider.fresh(sorts.PHeap)
+
+        def generalizeDecls(t: Term, h: Term) : Term = {
+          transform(t, { case App(f@Fun(_,_,_), args) if declsToGeneralizedDecls.contains(f) => App(declsToGeneralizedDecls(f), h +: args)})()
+        }
+
+        val generalizedDecls = declsToGeneralizedDecls.values.map(FunctionDecl(_))
+        val generalizedAssumptions = additionalAssumptions.map(t => {
+                generalizeDecls(t, freshSnapRoot)
+        })
+
+        generalizedDecls.map(v3.decider.prover.declare(_))
+
+        val wLambdaSupport = v3.decider.freshMacro("support"
+                                                  , Seq(freshSnapRoot)
+                                                  , And(generalizedAssumptions))
+
+        v3.decider.assume( Forall( Seq(freshSnapRoot)
+                                , PHeapLambdaApply(wLambda, freshSnapRoot) === generalizeDecls(snap, freshSnapRoot)
+                                , Seq(Trigger(PHeapLambdaApply(wLambda, freshSnapRoot)))
+        ))
+
+        // TODO: Re-organize such that we do not have to evaluate wand arguments and compute mwid twice (createChunk does it too)
+        evaluateWandArguments(s4, wand, pve, v3)((s5, tArgs, v4) => {
+          magicWandSupporter.createChunk(s4, wand, PHeapSingletonMagicWand(MagicWandIdentifier(wand, Verifier.program).toString, tArgs, wLambda), Some(wLambdaSupport.id), pve, v3)((s6, ch, v5) => {
+  //          say(s"done: create wand chunk: $ch")
+            appendToResults(s6, ch, v5.decider.pcs.after(preMark), v5)
+            Success()
+          })
         })
       }
     }
@@ -319,6 +352,7 @@ object magicWandSupporter extends SymbolicExecutionRules with Immutable {
        * into the rhs.
        */
       val freshSnapRoot = v1.decider.fresh(sorts.PHeap)
+      val preScriptMark = v1.decider.setPathConditionMark()
       produce(s1.copy(conservingSnapshotGeneration = true), freshSnapRoot, wand.left, pve, v1)((sLhs, v2) => {
 
         val proofScriptCfg = proofScript.toCfg()
@@ -357,14 +391,15 @@ object magicWandSupporter extends SymbolicExecutionRules with Immutable {
                              exhaleExt = false,
                              oldHeaps = s.oldHeaps)
 //            say(s"next: create wand chunk")
-            createWandChunkAndRecordResults(s4, freshSnapRoot, snap, v3)})})})})
+
+            createWandChunkAndRecordResults(s4, freshSnapRoot, snap, v3.decider.pcs.after(preScriptMark).declarations, v3.decider.pcs.after(preScriptMark).assumptions, v3)})})})})
 
     if (results.isEmpty) {
       // No results mean that packaging the wand resulted in inconsistent states on all paths,
       // and thus, that no wand chunk was created. In order to continue, we create one now.
       // Moreover, we need to set reserveHeaps to structurally match [State RHS] below.
       val s1 = sEmp.copy(reserveHeaps = Heap() +: Heap() +: Heap() +: s.reserveHeaps.tail)
-      createWandChunkAndRecordResults(s1, v.decider.fresh(sorts.PHeap), v.decider.fresh(sorts.PHeap), v)
+      createWandChunkAndRecordResults(s1, v.decider.fresh(sorts.PHeap), v.decider.fresh(sorts.PHeap), Set(), Set(), v)
     }
 
     results.foldLeft(r)((res, packageOut) => {
@@ -372,6 +407,12 @@ object magicWandSupporter extends SymbolicExecutionRules with Immutable {
         val state = packageOut._1
         val branchConditions = packageOut._2
         val conservedPcs = packageOut._3
+
+        /*conservedPcs.map(pc => {
+          println(pc.declarations)
+          println(pc.assumptions)
+        })*/
+
         val magicWandChunk = packageOut._4
         val s1 = state.copy(reserveHeaps = state.reserveHeaps.drop(3),
           parallelizeBranches = s.parallelizeBranches /* See comment above */
@@ -388,19 +429,31 @@ object magicWandSupporter extends SymbolicExecutionRules with Immutable {
                 v: Verifier)
                (Q: (State, Verifier) => VerificationResult)
                : VerificationResult = {
-        consume(s, wand, pve, v)((s1, snap, v1) => {
-          val wandSnap = MagicWandSnapshot(snap)
-          consume(s1, wand.left, pve, v1)((s2, snap, v2) => {
-            /* It is assumed that snap and wandSnap.abstractLhs are structurally the same.
-             * Since a wand can only be applied once, equating the two snapshots is sound.
-             */
-            assert(snap.sort == sorts.PHeap, s"expected snapshot but found: $snap")
-            v2.decider.assume(snap === wandSnap.abstractLhs)
-            val s3 = s2.copy(oldHeaps = s1.oldHeaps + (Verifier.MAGIC_WAND_LHS_STATE_LABEL -> magicWandSupporter.getEvalHeap(s1)))
-            produce(s3.copy(conservingSnapshotGeneration = true), wandSnap.rhsSnapshot, wand.right, pve, v2)((s4, v3) => {
-              val s5 = s4.copy(g = s1.g, conservingSnapshotGeneration = s3.conservingSnapshotGeneration)
-              val s6 = stateConsolidator.consolidate(s5, v3).copy(oldHeaps = s1.oldHeaps)
-              Q(s6, v3)})})})}
+
+
+        evaluateWandArguments(s, wand, pve, v)((s10, tArgs, v10) =>  {
+          val mwid = MagicWandIdentifier(wand, Verifier.program)
+
+          // TODO: Remove this layer breaking hack
+          val optSupportMacro = chunkSupporter.findChunk[MagicWandChunk](s10.h.values, mwid, tArgs, v10).flatMap(_.supportMacro)
+
+          consume(s10, wand, pve, v10)((s1, wandSnap, v1) => {
+            val wLambda = PHeapLookupMagicWand(mwid.toString, wandSnap, tArgs)
+
+            consume(s1, wand.left, pve, v1)((s2, snap, v2) => {
+              // assert(snap.sort == sorts.PHeap, s"expected snapshot but found: $snap")
+              val s3 = s2.copy(oldHeaps = s1.oldHeaps + (Verifier.MAGIC_WAND_LHS_STATE_LABEL -> magicWandSupporter.getEvalHeap(s1)))
+              optSupportMacro match {
+                case Some(supportMacro) =>
+                  v2.decider.assume(App(Macro(supportMacro, Seq(sorts.PHeap), sorts.Bool), snap))
+                case None => {}
+              }
+              produce(s3.copy(conservingSnapshotGeneration = true), PHeapLambdaApply(wLambda, snap), wand.right, pve, v2)((s4, v3) => {
+                val s5 = s4.copy(g = s1.g, conservingSnapshotGeneration = s3.conservingSnapshotGeneration)
+                val s6 = stateConsolidator.consolidate(s5, v3).copy(oldHeaps = s1.oldHeaps)
+                Q(s6, v3)})})
+          })
+        })}
 
   def transfer[CH <: Chunk]
               (s: State,

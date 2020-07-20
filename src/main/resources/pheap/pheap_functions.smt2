@@ -6,6 +6,8 @@
 (declare-fun PHeap.LHS (PHeap) PHeap)
 (declare-fun PHeap.RHS (PHeap) PHeap)
 
+(declare-fun PHeap.applyLambda (PHeapLambda PHeap) PHeap)
+
 (assert (forall ((h1 PHeap) (h2 PHeap)) (!
     (= (PHeap.LHS (PHeap.MWS h1 h2)) h1)
     :pattern (PHeap.LHS (PHeap.MWS h1 h2)))))

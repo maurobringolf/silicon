@@ -456,9 +456,12 @@ object consumer extends ConsumptionRules with Immutable {
 
       case wand: ast.MagicWand =>
         magicWandSupporter.evaluateWandArguments(s, wand, pve, v)((s1, tArgs, v1) => {
+          val mwid = MagicWandIdentifier(wand, Verifier.program).toString
           val ve = pve dueTo MagicWandChunkNotFound(wand)
           val description = s"consume wand $wand"
-          chunkSupporter.consume(s1, h, wand, tArgs, FullPerm(), ve, v1, description)(Q)
+          chunkSupporter.consume(s1, h, wand, tArgs, FullPerm(), ve, v1, description)((s2, h2, lambda, v2) => {
+            Q(s2, h2, PHeapSingletonMagicWand(mwid, tArgs, lambda), v2)
+          })
         })
 
       case _ =>

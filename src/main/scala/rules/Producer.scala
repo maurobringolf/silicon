@@ -144,6 +144,7 @@ object producer extends ProductionRules with Immutable {
       if (as.tail.isEmpty)
         wrappedProduceTlc(s, snap, a, pve, v)(Q)
       else {
+        val mark = v.decider.setPathConditionMark()
         val h1 = v.decider.appliedFresh("produced", sorts.PHeap, s.quantifiedVariables)
         val h2 = v.decider.appliedFresh("produced", sorts.PHeap, s.quantifiedVariables)
 
@@ -324,7 +325,7 @@ object producer extends ProductionRules with Immutable {
           Q(s2, v1)})
 
       case wand: ast.MagicWand =>
-        magicWandSupporter.createChunk(s, wand, MagicWandSnapshot(snap), pve, v)((s1, chWand, v1) =>
+        magicWandSupporter.createChunk(s, wand, snap, None, pve, v)((s1, chWand, v1) =>
           chunkSupporter.produce(s1, s1.h, chWand, v1)((s2, h2, v2) =>
             Q(s2.copy(h = h2), v2)))
 

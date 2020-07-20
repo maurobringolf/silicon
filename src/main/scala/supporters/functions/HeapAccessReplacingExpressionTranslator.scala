@@ -10,7 +10,7 @@ import com.typesafe.scalalogging.LazyLogging
 import viper.silver.ast
 import viper.silicon.Map
 import viper.silicon.rules.functionSupporter
-import viper.silicon.state.{Identifier, SimpleIdentifier, SuffixedIdentifier, SymbolConverter}
+import viper.silicon.state.{Identifier, SimpleIdentifier, SuffixedIdentifier, SymbolConverter, MagicWandIdentifier}
 import viper.silicon.state.utils.makeTriggersHeapIndependent
 import viper.silicon.state.terms._
 import viper.silicon.supporters.ExpressionTranslator
@@ -165,7 +165,18 @@ class HeapAccessReplacingExpressionTranslator(symbolConverter: SymbolConverter,
         this.snap = oldSnap
         teIn
 
-      case ast.Applying(_, eIn) => translate(toSort)(eIn)
+      case ast.Applying(wand, eIn) => {
+        val oldSnap = this.snap
+        val args = wand.subexpressionsToEvaluate(program)
+        val mwid = MagicWandIdentifier(wand, program).toString
+        this.snap = PHeapCombine( PHeapLambdaApply(PHeapLookupMagicWand(mwid, this.snap, args map translate), this.snap)
+                                , this.snap // Once we agree on framing semantics, the mw instance probably should be removed here
+                                )
+        translate(toSort)(eIn)
+        val teIn = translate(toSort)(eIn)
+        this.snap = oldSnap
+        teIn
+      }
 
       case eFApp: ast.FuncApp =>
         val silverFunc = program.findFunction(eFApp.funcname)

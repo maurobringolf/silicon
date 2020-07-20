@@ -270,6 +270,7 @@ trait DefaultDeciderProvider extends VerifierComponent { this: Verifier =>
       val appliedSorts = appliedArgs.map(_.sort)
       val func = fresh(id, appliedSorts, sort)
 
+
       App(func, appliedArgs)
     }
 
@@ -296,6 +297,15 @@ trait DefaultDeciderProvider extends VerifierComponent { this: Verifier =>
             case c if c == classOf[HeapDepFun] =>
               HeapDepFun(proverFun.id, proverFun.argSorts, proverFun.resultSort).asInstanceOf[F]
           }
+
+      /**
+       * [2020-07-15 Mauro]
+       *
+       * TODO: Is this functionality of recorded declarations currently broken?
+       * For some reason I had to add this myself here to obtain fresh symbol declarations from a path condition stack,
+       * but I am probably misunderstanding something.
+       **/
+      this.pcs.add(FunctionDecl(fun))
 
 //      _freshFunctions = _freshFunctions + FunctionDecl(fun) /* [BRANCH-PARALLELISATION] */
 

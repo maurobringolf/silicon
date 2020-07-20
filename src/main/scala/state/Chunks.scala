@@ -167,16 +167,18 @@ object MagicWandIdentifier {
 case class MagicWandChunk(id: MagicWandIdentifier,
                           bindings: Map[ast.AbstractLocalVar, Term],
                           args: Seq[Term],
-                          snap: MagicWandSnapshot,
-                          perm: Term)
+                          snap: Term,
+                          supportMacro: Option[Identifier],
+                          perm: Term
+                          )
     extends NonQuantifiedChunk {
 
   require(perm.sort == sorts.Perm, s"Permissions $perm must be of sort Perm, but found ${perm.sort}")
 
   override val resourceID = MagicWandID
 
-  override def withPerm(newPerm: Term) = MagicWandChunk(id, bindings, args, snap, newPerm)
-  override def withSnap(newSnap: Term) = MagicWandChunk(id, bindings, args, MagicWandSnapshot(newSnap), perm)
+  override def withPerm(newPerm: Term) = MagicWandChunk(id, bindings, args, snap, supportMacro, newPerm)
+  override def withSnap(newSnap: Term) = MagicWandChunk(id, bindings, args, MagicWandSnapshot(newSnap), supportMacro, perm)
 
   override lazy val toString = {
     val pos = id.ghostFreeWand.pos match {

@@ -13,7 +13,7 @@ import viper.silicon.interfaces.{PreambleContributor, PreambleReader}
 import viper.silicon.interfaces.decider.{ProverLike, TermConverter}
 import viper.silicon.state.SymbolConverter
 import viper.silicon.state.terms.{SortDecl, sorts}
-import viper.silicon.state.Identifier
+import viper.silicon.state.{Identifier, MagicWandIdentifier}
 import viper.silicon.state.terms._
 
 trait PHeapsContributor[SO, SY, AX] extends PreambleContributor[SO, SY, AX]
@@ -63,6 +63,26 @@ class DefaultPHeapsContributor(preambleReader: PreambleReader[String, String],
       "$PRD_LOC$" -> pLoc,
     )
   }
+  
+  private def magicWandSubstitutions(w: ast.MagicWand, program: ast.Program) : Map[String, String] = {
+    val id = MagicWandIdentifier(w, program).toString
+    val argSorts = w.subexpressionsToEvaluate(program).map(a => termConverter.convert(symbolConverter.toSort(a.typ)))
+    val args = argSorts.zipWithIndex.map({ case (_,i) => s"a${i}" }).mkString(" ")
+    val args_q = argSorts.zipWithIndex.map({ case (s,i) => s"(a${i} ${s})" }).mkString(" ")
+    val mwLoc = if (args.length > 0) {
+      "(PHeap.MWloc_" + id + " " + args + ")"
+    } else {
+      "PHeap.MWloc_" + id
+    }
+
+    Map(
+      "$MW$" -> id,
+      "$MW_ARGS_S$" -> argSorts.mkString(" "),
+      "$MW_ARGS_Q$" -> args_q,
+      "$MW_ARGS$" -> args,
+      "$MW_LOC$" -> mwLoc,
+    )
+  }
 
   private def addKeySuffix(m : Map[String, String], s : String) : Map[String, String] = m.map {
     case (k, v) => k.substring(0, k.length - 1) + s + "$" -> v
@@ -84,7 +104,8 @@ class DefaultPHeapsContributor(preambleReader: PreambleReader[String, String],
     collectedFunctionDecls =
       generatePHeapFunctions ++
       generateFieldFunctionDecls(program.fields) ++
-      generatePredicateFunctionDecls(program.predicates)
+      generatePredicateFunctionDecls(program.predicates) ++
+      generateMagicWandFunctionDecls(program)
     collectedAxioms =
       field_lookup_combine(program.fields) ++ 
       field_dom_combine(program.fields) ++
@@ -132,6 +153,22 @@ class DefaultPHeapsContributor(preambleReader: PreambleReader[String, String],
     predicates map (p => {
       val declarations = preambleReader.readParametricPreamble(templateFile, predicateSubstitutions(p))
       (s"$templateFile [${p.name}]", declarations)
+    })
+  }
+
+  def generateMagicWandFunctionDecls(program: ast.Program): Iterable[PreambleBlock] = {
+    val templateFile = "/pheap/magicwand_functions.smt2"
+    /* 
+    val wands = program.deepCollect({
+      case wand: ast.MagicWand => wand
+    })
+    */
+    val wands = program.magicWandStructures
+
+    wands map (w => {
+      val subs = magicWandSubstitutions(w, program)
+      val declarations = preambleReader.readParametricPreamble(templateFile, subs)
+      (s"$templateFile [${subs("$MW$")}]", declarations)
     })
   }
 
@@ -330,7 +367,7 @@ class DefaultPHeapsContributor(preambleReader: PreambleReader[String, String],
   def sortsAfterAnalysis: InsertionOrderedSet[sorts.FieldValueFunction] = InsertionOrderedSet.empty
 
   def declareSortsAfterAnalysis(sink: ProverLike): Unit = {
-    Seq(sorts.PHeap, sorts.Loc) foreach (s => sink.declare(SortDecl(s)))
+    Seq(sorts.PHeap, sorts.Loc, sorts.PHeapLambda) foreach (s => sink.declare(SortDecl(s)))
   }
 
   val symbolsAfterAnalysis: Iterable[String] =

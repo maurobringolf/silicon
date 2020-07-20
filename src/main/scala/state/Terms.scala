@@ -28,6 +28,7 @@ sealed trait Symbol extends Node {
 sealed trait Sort extends Symbol
 
 object sorts {
+  object PHeapLambda extends Sort { val id = Identifier("PHeapLambda"); override lazy val toString = id.toString }
   object PHeap extends Sort { val id = Identifier("PHeap"); override lazy val toString = id.toString }
   object Loc   extends Sort { val id = Identifier("Loc");   override lazy val toString = id.toString }
   object Snap  extends Sort { val id = Identifier("Snap");  override lazy val toString = id.toString }
@@ -1707,6 +1708,8 @@ object Second extends (Term => Term) {
 
 /* PHeaps */
 
+case class PHeapLambdaApply(val lambda: Term, val h: Term) extends PHeapTerm
+
 sealed trait PHeapTerm extends Term { override val sort = sorts.PHeap }
 
 class PHeapEqual(val h1: Term, val h2: Term) extends Term {
@@ -1795,6 +1798,14 @@ object PHeapPredicateLocInv extends ((String, Int, Sort, Term) => Term) {
 
   def unapply(pli: PHeapPredicateLocInv) = Some((pli.predicate, pli.idx, pli.sort, pli.loc))
 }
+
+// TODO: Syntactic opt
+case class PHeapLookupMagicWand(val mw: String, val h: Term, val args: Seq[Term]) extends Term {
+  val sort = sorts.PHeapLambda
+}
+
+// TODO: Syntactic opt
+case class PHeapSingletonMagicWand(val mw: String, val args: Seq[Term], val lambda: Term) extends PHeapTerm
 
 class PHeapLookupPredicate(val predicate: String, val h: Term, val args: Seq[Term]) extends PHeapTerm
 
