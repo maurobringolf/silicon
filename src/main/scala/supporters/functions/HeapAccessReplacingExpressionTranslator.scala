@@ -32,6 +32,7 @@ class HeapAccessReplacingExpressionTranslator(symbolConverter: SymbolConverter,
   private var failed = false
   private var shouldProjectHeapDeps = false
   private var snap: Term = functionSupporter.axiomSnapshotVariable
+  private var wildcardsAsFullPerms: Boolean = true
 
   var functionData: Map[ast.Function, FunctionData] = _
 
@@ -78,6 +79,7 @@ class HeapAccessReplacingExpressionTranslator(symbolConverter: SymbolConverter,
                             data: FunctionData)
                            : Seq[Term] = {
 
+    this.wildcardsAsFullPerms = true
     this.program = program
     this.data = data
     this.ignoreAccessPredicates = true
@@ -178,6 +180,8 @@ class HeapAccessReplacingExpressionTranslator(symbolConverter: SymbolConverter,
           fapp
         else
           fapp.copy(applicable = functionSupporter.limitedVersion(fun))
+
+      case _ : ast.WildcardPerm if this.wildcardsAsFullPerms => FullPerm()
 
       case _ => super.translate(symbolConverter.toSort)(e)
     }
