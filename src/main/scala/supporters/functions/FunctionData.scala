@@ -452,6 +452,8 @@ class FunctionData(val programFunction: ast.Function,
   }
 
   private def generateNestedDefinitionalAxioms: InsertionOrderedSet[Term] = {
+    val freshSymbols: Set[Identifier] = freshSymbolsAcrossAllPhases.map(_.id)
+
     val nested = (
     //   freshFieldInvs.flatMap(_.definitionalAxioms)
     //++ freshFvfsAndDomains.flatMap (fvfDef => fvfDef.domainDefinitions ++ fvfDef.valueDefinitions)
@@ -464,10 +466,11 @@ class FunctionData(val programFunction: ast.Function,
     // Once his changes are merged in, the commented warnings below should be turned into errors.
     nested.filter(term => {
       val freeVars = term.freeVariables -- axiomArguments
+      val unknownVars = freeVars.filterNot(v => freshSymbols.contains(v.id))
 
-    //if (freeVars.nonEmpty) {
+    //if (unknownVars.nonEmpty) {
     //  val messageText = (
-    //      s"Found unexpected free variables $freeVars "
+    //      s"Found unexpected free variables $unknownVars "
     //    + s"in term $term during axiomatisation of function "
     //    + s"${programFunction.name}")
     //
@@ -475,7 +478,7 @@ class FunctionData(val programFunction: ast.Function,
     //  logger warn messageText
     //}
 
-      freeVars.isEmpty
+      unknownVars.isEmpty
     })
   }
 

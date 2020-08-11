@@ -12,7 +12,7 @@ import viper.silver.verifier.{ErrorReason, PartialVerificationError}
 import viper.silver.verifier.reasons.{InsufficientPermission, MagicWandChunkNotFound}
 import viper.silicon.{toMap, Map, SymbExLogger}
 import viper.silicon.interfaces.state._
-import viper.silicon.interfaces.{Failure, VerificationResult}
+import viper.silicon.interfaces.VerificationResult
 import viper.silicon.resources.{NonQuantifiedPropertyInterpreter, QuantifiedPropertyInterpreter, Resources}
 import viper.silicon.state._
 import viper.silicon.state.terms._
@@ -734,7 +734,7 @@ object quantifiedChunkSupporter extends QuantifiedChunkSupport with Immutable {
               qid: String,
               optTrigger: Option[Seq[ast.Trigger]],
               tTriggers: Seq[Trigger],
-              auxGlobals: Seq[Quantification],
+              auxGlobals: Seq[Term],
               auxNonGlobals: Seq[Quantification],
               tCond: Term,
               tArgs: Seq[Term],
@@ -926,7 +926,7 @@ object quantifiedChunkSupporter extends QuantifiedChunkSupport with Immutable {
               qid: String,
               optTrigger: Option[Seq[ast.Trigger]],
               tTriggers: Seq[Trigger],
-              auxGlobals: Seq[Quantification],
+              auxGlobals: Seq[Term],
               auxNonGlobals: Seq[Quantification],
               tCond: Term,
               tArgs: Seq[Term],
@@ -1019,7 +1019,7 @@ object quantifiedChunkSupporter extends QuantifiedChunkSupport with Immutable {
               magicWandSupporter.transfer[QuantifiedBasicChunk](
                                           s.copy(smCache = smCache1),
                                           lossOfInvOfLoc,
-                                          Failure(pve dueTo insufficientPermissionReason/*InsufficientPermission(acc.loc)*/),
+                                          createFailure(pve dueTo insufficientPermissionReason/*InsufficientPermission(acc.loc)*/, v, s),
                                           v)((s2, heap, rPerm, v2) => {
                 val (relevantChunks, otherChunks) =
                   quantifiedChunkSupporter.splitHeap[QuantifiedBasicChunk](
@@ -1119,8 +1119,8 @@ object quantifiedChunkSupporter extends QuantifiedChunkSupport with Immutable {
 
     val resource = resourceAccess.res(Verifier.program)
     val failure = resourceAccess match {
-      case locAcc: ast.LocationAccess => Failure(pve dueTo InsufficientPermission(locAcc))
-      case wand: ast.MagicWand => Failure(pve dueTo MagicWandChunkNotFound(wand))
+      case locAcc: ast.LocationAccess => createFailure(pve dueTo InsufficientPermission(locAcc), v, s)
+      case wand: ast.MagicWand => createFailure(pve dueTo MagicWandChunkNotFound(wand), v, s)
       case _ => sys.error(s"Found resource $resourceAccess, which is not yet supported as a quantified resource.")
     }
     val chunkIdentifier = ChunkIdentifier(resource, Verifier.program)
