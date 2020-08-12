@@ -17,3 +17,19 @@
 (assert (Set_equal
   (PHeap.dom_$MW$ PHeap.emp)
   (as Set_empty Set<Loc>)))
+
+(assert (forall ((h1 PHeap) (h2 PHeap) $MW_ARGS_Q$)
+	(!
+		(=>
+			(Set_in $MW_LOC$ (PHeap.dom_$MW$ h1))
+			(=
+				(PHeap.lookup_$MW$ (PHeap.combine h1 h2) $MW_LOC$)
+				(PHeap.lookup_$MW$ h1 $MW_LOC$)
+			)
+		)
+		:pattern (PHeap.lookup_$MW$ (PHeap.combine h1 h2) $MW_LOC$)
+		:pattern ((PHeap.lookup_$MW$ h1 $MW_LOC$) (PHeap.combine h1 h2))
+		:qid |PHeap.mw_lookup_combine[$MW$]|)))
+
+
+
