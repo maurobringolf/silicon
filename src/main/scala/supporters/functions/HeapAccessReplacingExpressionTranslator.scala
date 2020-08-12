@@ -33,6 +33,9 @@ class HeapAccessReplacingExpressionTranslator(symbolConverter: SymbolConverter,
   private var shouldProjectHeapDeps = false
   private var snap: Term = functionSupporter.axiomSnapshotVariable
   private var wildcardsAsFullPerms: Boolean = true
+  private var applyings : Map[ast.MagicWandStructure.MagicWandStructure, Term] = Map()
+  private var unfoldings : Map[ast.Predicate, Term] = Map()
+
 
   var functionData: Map[ast.Function, FunctionData] = _
 
@@ -52,6 +55,18 @@ class HeapAccessReplacingExpressionTranslator(symbolConverter: SymbolConverter,
     val result = func.body map translate
 
     if (failed) None else result
+  }
+
+  def translateWithContext(program: ast.Program,
+                           func: ast.Function,
+                           data: FunctionData) : (Option[Term], Map[ast.MagicWandStructure.MagicWandStructure, Term], Map[ast.Predicate, Term]) = {
+
+    this.applyings = Map() : Map[ast.MagicWandStructure.MagicWandStructure, Term]
+    this.unfoldings = Map() : Map[ast.Predicate, Term]
+
+    val result = translate(program, func, data)
+
+    (result, applyings, unfoldings)
   }
 
   private def translate(exp: ast.Exp): Term = {
@@ -170,8 +185,9 @@ class HeapAccessReplacingExpressionTranslator(symbolConverter: SymbolConverter,
         val oldSnap = this.snap
         val args = wand.subexpressionsToEvaluate(program)
         val mwid = MagicWandIdentifier(wand, program).toString
+        this.applyings += (wand.structure(program) -> this.snap)
         this.snap = PHeapCombine( PHeapLambdaApply(PHeapLookupMagicWand(mwid, this.snap, args map translate), this.snap)
-                                , this.snap // Once we agree on framing semantics, the mw instance probably should be removed here
+                                , this.snap // TODO Once we agree on framing semantics, the mw instance probably should be removed here
                                 )
         translate(toSort)(eIn)
         val teIn = translate(toSort)(eIn)

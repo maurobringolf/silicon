@@ -325,9 +325,24 @@ object magicWandSupporter extends SymbolicExecutionRules with Immutable {
 
         generalizedDecls.map(v3.decider.prover.declare(_))
 
-        val wLambdaSupport = v3.decider.freshMacro("support"
+
+        val wLambdaSupport = v3.decider.freshMacro( MagicWandIdentifier(wand, Verifier.program).toString + "_support"
                                                   , Seq(freshSnapRoot)
                                                   , And(generalizedAssumptions))
+        
+        // All functions that apply a matching wand need to learn the support facts
+        Verifier.program.functions.map(f => {
+          val data = Verifier.functionData(f)
+          val isRelevant = data.wandsInPrecondition.contains(wand.structure(Verifier.program))
+          if (isRelevant) {
+            val supportTrigger = data.wandSupportTriggersWithWand(wand.structure(Verifier.program))
+            val h = Var(Identifier("h"), sorts.PHeap)
+            v3.decider.assume( Forall( Seq(h)
+                                     , Implies(App(supportTrigger, Seq(h)), App(Macro(wLambdaSupport.id, Seq(sorts.PHeap), sorts.Bool), h))
+                                     , Seq(Trigger(App(supportTrigger, Seq(h))))
+                                     ))
+          }
+        })
 
         v3.decider.assume( Forall( Seq(freshSnapRoot)
                                 , PHeapLambdaApply(wLambda, freshSnapRoot) === generalizeDecls(snap, freshSnapRoot)

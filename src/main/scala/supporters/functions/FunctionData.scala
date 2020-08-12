@@ -59,6 +59,30 @@ class FunctionData(val programFunction: ast.Function,
 
   lazy val qpInversesMap : QPinvMap = if (programFunction.pres.isEmpty) Map.empty else getQPInversesMap(programFunction.pres.reduce((p1,p2) => ast.And(p1,p2)()))
 
+  lazy val wandsInPreconditionWithRelativeSnapshots : Map[ast.MagicWandStructure.MagicWandStructure, Term] = {
+    translationWithContext._2
+  }
+
+  def wandsInPrecondition : Seq[ast.MagicWandStructure.MagicWandStructure] = wandsInPreconditionWithRelativeSnapshots.keys.toSeq
+
+  def wandSupportTriggersWithWand : Map[ast.MagicWandStructure.MagicWandStructure, Fun] = toMap(wandsInPrecondition.map(mw => {
+    (mw, Fun(Identifier(f"${programFunction.name}_appliesWand_${MagicWandIdentifier(mw, program)}"), /*arguments.map(_.sort)*/ Seq(sorts.PHeap) , sorts.Bool))
+  }))
+
+  def wandSupportTriggers : Iterable[Fun] = wandSupportTriggersWithWand.values
+
+  // TODO: This relies on triggering for soundness which we want to avoid,
+  //       i.e. the support facts should really only be obtainable for function applications that really are there
+  def wandSupportAxiom : Term = {
+    Forall( axiomArguments
+          , And(wandsInPreconditionWithRelativeSnapshots.values.zip(wandSupportTriggers).map({ case (h, support) => {
+              App(support, h)
+            }}))
+          , Seq(Trigger(functionApplication))
+          , f"appliesWandsAxiom[${function.id.name}]"
+          )
+  }
+
   def qpInverses : Iterable[Fun] = qpInversesMap.values.flatMap(_._2.values)
   def qpInversesAxioms : Iterable[Term] = qpInversesMap.values.flatMap(_._1)
 
@@ -555,10 +579,16 @@ class FunctionData(val programFunction: ast.Function,
     }))
   }
 
+  lazy val translationWithContext : (Option[Term], Map[ast.MagicWandStructure.MagicWandStructure, Term], Map[ast.Predicate, Term]) = {
+    expressionTranslator.translateWithContext(program, programFunction, this)
+  }
+
+  // TODO also do predicateTriggers via context coming out of translation (need to store them in translator too, not done yet)
   lazy val definitionalAxiom: Option[Term] = {
     assert(phase == 2, s"Definitional axiom must be generated in phase 2, current phase is $phase")
 
-    val optBody = expressionTranslator.translate(program, programFunction, this)
+    val optBody = translationWithContext._1
+    // val optBody = expressionTranslator.translate(program, programFunction, this)
 
     optBody.map(translatedBody => {
       val pre = And(translatedPres)
