@@ -159,6 +159,12 @@ class FunctionData(val programFunction: ast.Function,
   
   def restrictHeapAxiom() : Term = {
 
+    val isMWfunction = programFunction.pres.flatMap(pre => pre.deepCollect({ case mw:ast.MagicWand => true})).exists(x => x)
+    if (isMWfunction) {
+      // Make restrict_f the identity in these cases
+      return Forall(axiomArguments, restrictHeapApplication === functionSupporter.axiomSnapshotVariable, Trigger(restrictHeapApplication), s"restrictHeapAxiom [${function.id.name}]")
+    }
+
     val translatedDomains = programFunction.pres.map(pre => {
         translatePreconditionToDomain(pre)    
     })
