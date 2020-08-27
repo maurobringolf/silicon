@@ -22,6 +22,14 @@
 	:pattern (PHeap.dom_$PRD$ (PHeap.remove_$PRD$ h $PRD_ARGS$))
 	:qid |dom_$PRD$_remove_$PRD$|)))
 
+(assert (forall ($PRD_ARGS_Q$ (h PHeap) (l Loc)) (!
+	(=>
+		(not (= $PRD_LOC$ l))
+		(= (PHeap.lookup_$PRD$ (PHeap.remove_$PRD$ h $PRD_ARGS$) l) (PHeap.lookup_$PRD$ h l))
+	)
+	:pattern (PHeap.lookup_$PRD$ (PHeap.remove_$PRD$ h $PRD_ARGS$) l)
+	:qid |lookup_$PRD$_remove_$PRD$|)))
+
 (assert (forall ($PRD_ARGS_Q$ (h PHeap)) (!
 	(= (PHeap.dom_$PRD$ (PHeap.singleton_$PRD$ $PRD_ARGS$ h)) (Set_singleton $PRD_LOC$ ))
 	:pattern (PHeap.dom_$PRD$ (PHeap.singleton_$PRD$ $PRD_ARGS$ h))
