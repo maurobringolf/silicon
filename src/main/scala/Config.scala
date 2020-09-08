@@ -342,6 +342,7 @@ class Config(args: Seq[String]) extends SilFrontendConfig(args, "Silicon") {
       case "QPMW" => LanguageFeature.QuantifiedMagicWands
       case "QPP" => LanguageFeature.QuantifiedPredicates
       case "QPF" => LanguageFeature.QuantifiedFields
+      case "MWFUN" => LanguageFeature.MagicWandFunction
     })
   }
 
