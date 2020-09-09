@@ -13,14 +13,13 @@ import viper.silicon.state._
 import viper.silicon.state.terms._
 import viper.silicon.state.terms.perms._
 import viper.silicon.state.terms.predef.`?r`
-import viper.silicon.supporters.functions.FunctionRecorder
 import viper.silicon.verifier.Verifier
 
 trait StateConsolidationRules extends SymbolicExecutionRules {
   def consolidate(s: State, v: Verifier): State
   def consolidateIfRetrying(s: State, v: Verifier): State
-  def merge(fr: FunctionRecorder, h: Heap, newH: Heap, v: Verifier): (FunctionRecorder, Heap)
-  def merge(fr: FunctionRecorder, h: Heap, ch: NonQuantifiedChunk, v: Verifier): (FunctionRecorder, Heap)
+  def merge(h: Heap, newH: Heap, v: Verifier): Heap
+  def merge(h: Heap, ch: NonQuantifiedChunk, v: Verifier): Heap
   def assumeUpperPermissionBoundForQPFields(s: State, v: Verifier): State
   def assumeUpperPermissionBoundForQPFields(s: State, heaps: Seq[Heap], v: Verifier): State
 }
@@ -50,8 +49,8 @@ object stateConsolidator extends StateConsolidationRules with Immutable {
 
     val initialHeaps = s.h +: s.reserveHeaps
 
-    val (functionRecorderAfterHeapMerging, mergedHeaps) =
-      initialHeaps.foldLeft((s.functionRecorder, Nil: List[Heap])) { case ((fr, hs), h) =>
+    val mergedHeaps =
+      initialHeaps.foldLeft(Nil: List[Heap]) { case (hs, h) =>
         val (nonQuantifiedChunks, otherChunks) = partition(h)
 
         var continue = false
@@ -59,14 +58,12 @@ object stateConsolidator extends StateConsolidationRules with Immutable {
         var mergedChunks: Seq[NonQuantifiedChunk] = Nil
         var destChunks: Seq[NonQuantifiedChunk] = Nil
         var newChunks: Seq[NonQuantifiedChunk] = nonQuantifiedChunks
-        var functionRecorder: FunctionRecorder = fr
 
         do {
-          val (_functionRecorder, _mergedChunks, _, snapEqs) = singleMerge(functionRecorder, destChunks, newChunks, v)
+          val (_mergedChunks, _, snapEqs) = singleMerge(destChunks, newChunks, v)
 
           snapEqs foreach v.decider.assume
 
-          functionRecorder = _functionRecorder
           mergedChunks = _mergedChunks
           destChunks = Nil
           newChunks = mergedChunks
@@ -85,11 +82,10 @@ object stateConsolidator extends StateConsolidationRules with Immutable {
           v.decider.assume(interpreter.buildPathConditionsForResource(id, desc.delayedProperties))
         }
 
-        (functionRecorder, hs :+ Heap(allChunks))
+        hs :+ Heap(allChunks)
       }
 
-    val s1 = s.copy(functionRecorder = functionRecorderAfterHeapMerging,
-                    h = mergedHeaps.head,
+    val s1 = s.copy(h = mergedHeaps.head,
                     reserveHeaps = mergedHeaps.tail)
 
     val s2 = assumeUpperPermissionBoundForQPFields(s1, v)
@@ -101,14 +97,14 @@ object stateConsolidator extends StateConsolidationRules with Immutable {
     if (s.retrying) consolidate(s, v)
     else s
 
-  def merge(fr: FunctionRecorder, h: Heap, ch: NonQuantifiedChunk, v: Verifier): (FunctionRecorder, Heap) = {
-    merge(fr, h, Heap(Seq(ch)), v)
+  def merge(h: Heap, ch: NonQuantifiedChunk, v: Verifier): Heap = {
+    merge(h, Heap(Seq(ch)), v)
   }
 
-  def merge(fr1: FunctionRecorder, h: Heap, newH: Heap, v: Verifier): (FunctionRecorder, Heap) = {
+  def merge(h: Heap, newH: Heap, v: Verifier): Heap = {
     val (nonQuantifiedChunks, otherChunks) = partition(h)
     val (newNonQuantifiedChunks, newOtherChunk) = partition(newH)
-    val (fr2, mergedChunks, newlyAddedChunks, snapEqs) = singleMerge(fr1, nonQuantifiedChunks, newNonQuantifiedChunks, v)
+    val (mergedChunks, newlyAddedChunks, snapEqs) = singleMerge(nonQuantifiedChunks, newNonQuantifiedChunks, v)
 
     v.decider.assume(snapEqs)
 
@@ -118,23 +114,21 @@ object stateConsolidator extends StateConsolidationRules with Immutable {
       v.decider.assume(interpreter.buildPathConditionsForChunk(ch, resource.instanceProperties))
     }
 
-    (fr2, Heap(mergedChunks ++ otherChunks ++ newOtherChunk))
+    Heap(mergedChunks ++ otherChunks ++ newOtherChunk)
   }
 
-  private def singleMerge(fr: FunctionRecorder,
-                          destChunks: Seq[NonQuantifiedChunk],
+  private def singleMerge(destChunks: Seq[NonQuantifiedChunk],
                           newChunks: Seq[NonQuantifiedChunk],
                           v: Verifier)
-                         : (FunctionRecorder,
-                            Seq[NonQuantifiedChunk],
+                         : (Seq[NonQuantifiedChunk],
                             Seq[NonQuantifiedChunk],
                             InsertionOrderedSet[Term]) = {
 
     // bookkeeper.heapMergeIterations += 1
 
-    val initial = (fr, destChunks, Seq[NonQuantifiedChunk](), InsertionOrderedSet[Term]())
+    val initial = (destChunks, Seq[NonQuantifiedChunk](), InsertionOrderedSet[Term]())
 
-    newChunks.foldLeft(initial) { case ((fr1, accMergedChunks, accNewChunks, accSnapEqs), nextChunk) =>
+    newChunks.foldLeft(initial) { case ((accMergedChunks, accNewChunks, accSnapEqs), nextChunk) =>
       /* accMergedChunks: already merged chunks
        * accNewChunks: newly added chunks
        * accSnapEqs: collected snapshot equalities
@@ -144,25 +138,25 @@ object stateConsolidator extends StateConsolidationRules with Immutable {
 
       chunkSupporter.findMatchingChunk(accMergedChunks, nextChunk, v) match {
         case Some(ch) =>
-          mergeChunks(fr1, ch, nextChunk, v) match {
-            case Some((fr2, newChunk, snapEq)) =>
-              (fr2, newChunk +: accMergedChunks.filterNot(_ == ch), newChunk +: accNewChunks, accSnapEqs + snapEq)
+          mergeChunks(ch, nextChunk, v) match {
+            case Some((newChunk, snapEq)) =>
+              (newChunk +: accMergedChunks.filterNot(_ == ch), newChunk +: accNewChunks, accSnapEqs + snapEq)
             case None =>
-              (fr1, nextChunk +: accMergedChunks, nextChunk +: accNewChunks, accSnapEqs)
+              (nextChunk +: accMergedChunks, nextChunk +: accNewChunks, accSnapEqs)
           }
         case None =>
-          (fr1, nextChunk +: accMergedChunks, nextChunk +: accNewChunks, accSnapEqs)
+          (nextChunk +: accMergedChunks, nextChunk +: accNewChunks, accSnapEqs)
       }
     }
   }
 
   // Merges two chunks that are aliases (i.e. that have the same id and the args are proven to be equal)
   // and returns the merged chunk or None, if the chunks could not be merged
-  private def mergeChunks(fr1: FunctionRecorder, chunk1: NonQuantifiedChunk, chunk2: NonQuantifiedChunk, v: Verifier) = (chunk1, chunk2) match {
+  private def mergeChunks(chunk1: NonQuantifiedChunk, chunk2: NonQuantifiedChunk, v: Verifier) = (chunk1, chunk2) match {
     case (BasicChunk(rid1, id1, args1, snap1, perm1), BasicChunk(_, _, _, snap2, perm2)) =>
-      val (fr2, combinedSnap, snapEq) = combineSnapshots(fr1, snap1, snap2, perm1, perm2, v)
+      val (combinedSnap, snapEq) = combineSnapshots(snap1, snap2, perm1, perm2, v)
 
-      Some(fr2, BasicChunk(rid1, id1, args1, combinedSnap, PermPlus(perm1, perm2)), snapEq)
+      Some(BasicChunk(rid1, id1, args1, combinedSnap, PermPlus(perm1, perm2)), snapEq)
     case (_, _) =>
       None
   }
@@ -170,18 +164,17 @@ object stateConsolidator extends StateConsolidationRules with Immutable {
   /** Merge the snapshots of two chunks that denote the same location, i.e. whose ids and arguments
     * are known to be equal.
     *
-    * @param fr The functionRecorder to use when new snapshots are generated.
     * @param t1 The first chunk's snapshot.
     * @param t2 The second chunk's snapshot.
     * @param p1 The first chunk's permission amount.
     * @param p2 The second chunk's permission amount.
     * @param v The verifier to use.
-    * @return A tuple (fr, snap, def) of functionRecorder, a snapshot snap and a term def constraining snap.
+    * @return A tuple (snap, def) of a snapshot snap and a term def constraining snap.
     */
-  private def combineSnapshots(fr: FunctionRecorder, t1: Term, t2: Term, p1: Term, p2: Term, v: Verifier): (FunctionRecorder, Term, Term) = {
+  private def combineSnapshots(t1: Term, t2: Term, p1: Term, p2: Term, v: Verifier): (Term, Term) = {
     (IsPositive(p1), IsPositive(p2)) match {
-      case (True(), b2) => (fr, t1, Implies(b2, t1 === t2))
-      case (b1, True()) => (fr, t2, Implies(b1, t2 === t1))
+      case (True(), b2) => (t1, Implies(b2, t1 === t2))
+      case (b1, True()) => (t2, Implies(b1, t2 === t1))
       case (b1, b2) =>
         /*
          * Since it is not definitely known whether p1 and p2 are positive,
@@ -189,7 +182,7 @@ object stateConsolidator extends StateConsolidationRules with Immutable {
          * to use t1 or t2 and constrain it.
          */
         val t3 = v.decider.fresh(t1.sort)
-        (fr.recordFreshSnapshot(t3), t3, And(Implies(b1, t3 === t1), Implies(b2, t3 === t2)))
+        (t3, And(Implies(b1, t3 === t1), Implies(b2, t3 === t2)))
     }
   }
 

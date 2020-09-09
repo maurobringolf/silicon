@@ -15,7 +15,6 @@ import viper.silicon.resources.{FieldID, PredicateID}
 import viper.silicon.state.terms.predef.`?r`
 import viper.silicon.state.terms._
 import viper.silicon.state._
-import viper.silicon.supporters.functions.NoopFunctionRecorder
 import viper.silicon.verifier.Verifier
 import viper.silicon.{GlobalBranchRecord, ProduceRecord, SymbExLogger}
 
@@ -288,7 +287,7 @@ object producer extends ProductionRules with Immutable {
             } else {
               val ch = BasicChunk(PredicateID, BasicChunkIdentifier(predicate.name), tArgs, predSnap, gain)
               chunkSupporter.produce(s2, s2.h, ch, v2)((s3, h3, v3) => {
-                if (Verifier.config.enablePredicateTriggersOnInhale() && s3.functionRecorder == NoopFunctionRecorder) {
+                if (Verifier.config.enablePredicateTriggersOnInhale()) {
                   v3.decider.assume(App(Verifier.predicateData(predicate).triggerFunction, snap +: tArgs))
                 }
                 Q(s3.copy(h = h3), v3)})
@@ -318,7 +317,6 @@ object producer extends ProductionRules with Immutable {
           val smDef = SnapshotMapDefinition(wand, sm, Seq(smValueDef), Seq())
           val s2 =
             s1.copy(h = h2,
-                    functionRecorder = s1.functionRecorder.recordFvfAndDomain(smDef),
                     smCache = smCache1,
                     conservedPcs = conservedPcs)
           Q(s2, v1)})

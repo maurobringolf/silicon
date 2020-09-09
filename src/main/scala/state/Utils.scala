@@ -8,7 +8,6 @@ package viper.silicon.state
 
 import scala.collection.mutable
 import viper.silicon.state.terms._
-import viper.silicon.verifier.Verifier
 
 package object utils {
 

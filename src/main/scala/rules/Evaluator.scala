@@ -182,8 +182,7 @@ object evaluator extends EvaluationRules with Immutable {
          *       term returned by eval, mark as constrainable on client-side (e.g. in consumer).
          */
         val s1 =
-          s.copy(functionRecorder = s.functionRecorder.recordArp(tVar, tConstraints))
-           .setConstrainable(Seq(tVar), true)
+          s.setConstrainable(Seq(tVar), true)
         Q(s1, tVar, v)
 
       case fa: ast.FieldAccess if s.qpFields.contains(fa.field) =>
@@ -205,17 +204,14 @@ object evaluator extends EvaluationRules with Immutable {
               v1.decider.assume(trigger)
               if (s1.triggerExp) {
                 val fvfLookup = Lookup(fa.field.name, fvfDef.sm, tRcvr)
-                val fr1 = s1.functionRecorder.recordSnapshot(fa, v1.decider.pcs.branchConditions, fvfLookup)
-                val s2 = s1.copy(functionRecorder = fr1)
-                Q(s2, fvfLookup, v1)
+                Q(s1, fvfLookup, v1)
               } else {
                 v1.decider.assert(IsPositive(totalPermissions.replace(`?r`, tRcvr))) {
                   case false =>
                     createFailure(pve dueTo InsufficientPermission(fa), v1, s1)
                   case true =>
                     val fvfLookup = Lookup(fa.field.name, fvfDef.sm, tRcvr)
-                    val fr1 = s1.functionRecorder.recordSnapshot(fa, v1.decider.pcs.branchConditions, fvfLookup).recordFvfAndDomain(fvfDef)
-                    val s2 = s1.copy(functionRecorder = fr1, possibleTriggers = if (s1.recordPossibleTriggers) s1.possibleTriggers + (fa -> trigger) else s1.possibleTriggers)
+                    val s2 = s1.copy(possibleTriggers = if (s1.recordPossibleTriggers) s1.possibleTriggers + (fa -> trigger) else s1.possibleTriggers)
                     Q(s2, fvfLookup, v1)}
               }
             case _ =>
@@ -243,11 +239,7 @@ object evaluator extends EvaluationRules with Immutable {
                   createFailure(pve dueTo InsufficientPermission(fa), v1, s1)
                 case true =>
                   val smLookup = Lookup(fa.field.name, smDef1.sm, tRcvr)
-                  val fr2 =
-                    s1.functionRecorder.recordSnapshot(fa, v1.decider.pcs.branchConditions, smLookup)
-                                       .recordFvfAndDomain(smDef1)
-                  val s2 = s1.copy(functionRecorder = fr2,
-                                   smCache = smCache1)
+                  val s2 = s1.copy(smCache = smCache1)
                   Q(s2, smLookup, v1)}
               }})
 
@@ -256,8 +248,7 @@ object evaluator extends EvaluationRules with Immutable {
           val ve = pve dueTo InsufficientPermission(fa)
           val resource = fa.res(Verifier.program)
           chunkSupporter.lookup(s1, s1.h, resource, tArgs, ve, v1)((s2, h2, tSnap, v2) => {
-            val fr = s2.functionRecorder.recordSnapshot(fa, v2.decider.pcs.branchConditions, tSnap)
-            val s3 = s2.copy(h = h2, functionRecorder = fr)
+            val s3 = s2.copy(h = h2)
             Q(s3, tSnap, v1)
           })
         })
@@ -658,39 +649,12 @@ object evaluator extends EvaluationRules with Immutable {
                 reasonOffendingNode.replace(formalsToActuals)), exampleTrafo)
             val s3 = s2.copy(g = Store(fargs.zip(tArgs)),
                              recordVisited = true,
-                             functionRecorder = s2.functionRecorder.changeDepthBy(+1),
-                                /* Temporarily disable the recorder: when recording (to later on
-                                 * translate a particular function fun) and a function application
-                                 * fapp is hit, then there is no need to record any information
-                                 * about assertions from fapp's precondition since the latter is not
-                                 * translated as part of the translation of fun.
-                                 * Recording such information is even potentially harmful if formals
-                                 * are not syntactically replaced by actuals but rather bound to
-                                 * them via the store. Consider the following function:
-                                 *   function fun(x: Ref)
-                                 *     requires foo(x) // foo is another function
-                                 *     ...
-                                 *   { ... fun(x.next) ...}
-                                 * For fun(x)'s precondition, a mapping from foo(x) to a snapshot is
-                                 * recorded. When fun(x.next) is hit, its precondition is consumed,
-                                 * but without substituting actuals for formals, continuing to
-                                 * record mappings would add another mapping from foo(x) (which is
-                                 * actually foo(x.next)) to some potentially different snapshot.
-                                 * When translating fun(x) to an axiom, the snapshot of foo(x) from
-                                 * fun(x)'s precondition will be the branch-condition-dependent join
-                                 * of the recorded snapshots - which is wrong (probably only
-                                 * incomplete).
-                                 */
                              smDomainNeeded = true)
             consumes(s3, pres, _ => pvePre, v2)((s4, snap, v3) => {
               val tFApp = App(v3.symbolConverter.toFunction(func), snap :: tArgs)
-              val fr5 =
-                s4.functionRecorder.changeDepthBy(-1)
-                                   .recordSnapshot(fapp, v3.decider.pcs.branchConditions, snap)
               val s5 = s4.copy(g = s2.g,
                                h = s2.h,
                                recordVisited = s2.recordVisited,
-                               functionRecorder = fr5,
                                smDomainNeeded = s2.smDomainNeeded,
                                hackIssue387DisablePermissionConsumption = s.hackIssue387DisablePermissionConsumption)
               QB(s5, tFApp, v3)})
@@ -721,11 +685,7 @@ object evaluator extends EvaluationRules with Immutable {
 //                        eval(σ1, eIn, pve, c4)((tIn, c5) =>
 //                          QB(tIn, c5))})
                     consume(s4, acc, pve, v3)((s5, snap, v4) => {
-                      val fr6 =
-                        s5.functionRecorder.recordSnapshot(pa, v4.decider.pcs.branchConditions, snap)
-                                           .changeDepthBy(+1)
-                      val s6 = s5.copy(functionRecorder = fr6,
-                                       constrainableARPs = s1.constrainableARPs)
+                      val s6 = s5.copy(constrainableARPs = s1.constrainableARPs)
                         /* Recording the unfolded predicate's snapshot is necessary in order to create the
                          * additional predicate-based trigger function applications because these are applied
                          * to the function arguments and the predicate snapshot
@@ -738,7 +698,6 @@ object evaluator extends EvaluationRules with Immutable {
                       val s7a = s7.copy(g = insg)
                       produce(s7a, PHeapLookupPredicate(predicateName, snap, tArgs), body, pve, v4)((s8, v5) => {
                         val s9 = s8.copy(g = s7.g,
-                                         functionRecorder = s8.functionRecorder.changeDepthBy(-1),
                                          recordVisited = s3.recordVisited,
                                          permissionScalingFactor = s6.permissionScalingFactor)
                                    .decCycleCounter(predicate)
@@ -1201,7 +1160,6 @@ object evaluator extends EvaluationRules with Immutable {
           Implies(And(entry.pathConditions.branchConditions), joinTerm === entry.data))
 
         var sJoined = entries.tail.foldLeft(entries.head.s)((sAcc, entry) =>sAcc.merge(entry.s))
-        sJoined = sJoined.copy(functionRecorder = sJoined.functionRecorder.recordPathSymbol(joinSymbol))
 
         v.decider.assume(joinDefEqs)
 

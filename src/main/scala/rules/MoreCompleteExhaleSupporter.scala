@@ -15,7 +15,6 @@ import viper.silicon.rules.chunkSupporter.findChunksWithID
 import viper.silicon.state._
 import viper.silicon.state.terms._
 import viper.silicon.state.terms.perms.{IsNonPositive, IsPositive}
-import viper.silicon.supporters.functions.NoopFunctionRecorder
 import viper.silicon.verifier.Verifier
 import viper.silver.ast
 import viper.silver.verifier.VerificationError
@@ -78,7 +77,7 @@ object moreCompleteExhaleSupporter extends SymbolicExecutionRules with Immutable
           case Equals(`?s`, snap) => ReusedSummarisingSnapshot(snap)
         }.getOrElse({
           // val ss = v.decider.appliedFresh("ss", sort, s.relevantQuantifiedVariables)
-          val ss = v.decider.appliedFresh("ss", sort, s.functionRecorderQuantifiedVariables())
+          val ss = v.decider.appliedFresh("ss", sort, Seq())
           FreshSummarisingSnapshot(ss)
         })
 
@@ -114,18 +113,7 @@ object moreCompleteExhaleSupporter extends SymbolicExecutionRules with Immutable
     v.decider.assume(And(snapDefs))
 //    v.decider.assume(PermAtMost(permSum, FullPerm())) /* Done in StateConsolidator instead */
 
-    val s2 =
-      taggedSnap match {
-        case _: FreshSummarisingSnapshot =>
-          val smd = SnapshotMapDefinition(resource, taggedSnap.snapshot, snapDefs, Seq.empty)
-          val fr2 = s1.functionRecorder.recordFvfAndDomain(smd)
-
-          s1.copy(functionRecorder = fr2)
-        case _ =>
-          s1
-      }
-
-    Q(s2, taggedSnap.snapshot, snapDefs, permSum, v)
+    Q(s1, taggedSnap.snapshot, snapDefs, permSum, v)
   }
 
   def lookupComplete(s: State,
@@ -167,7 +155,7 @@ object moreCompleteExhaleSupporter extends SymbolicExecutionRules with Immutable
                      (Q: (State, Heap, Option[Term], Verifier) => VerificationResult)
                      : VerificationResult = {
 
-    if (s.functionRecorder == NoopFunctionRecorder && !s.hackIssue387DisablePermissionConsumption)
+    if (!s.hackIssue387DisablePermissionConsumption)
       actualConsumeComplete(s, h, resource, args, perms, ve, v)(Q)
     else
       summariseHeapAndAssertReadAccess(s, h, resource, args, perms, ve, v)(Q)
@@ -237,7 +225,6 @@ object moreCompleteExhaleSupporter extends SymbolicExecutionRules with Immutable
       }
 
       val additionalArgs = s.relevantQuantifiedVariables
-      var currentFunctionRecorder = s.functionRecorder
 
       relevantChunks.sortWith(sortFunction) foreach { ch =>
         if (moreNeeded) {
@@ -249,7 +236,6 @@ object moreCompleteExhaleSupporter extends SymbolicExecutionRules with Immutable
           val pTakenMacro = Macro(pTakenDecl.id, pTakenDecl.args.map(_.sort), pTakenDecl.body.sort)
           val pTaken = App(pTakenMacro, pTakenArgs)
 
-          currentFunctionRecorder = currentFunctionRecorder.recordFreshMacro(pTakenDecl)
           SymbExLogger.currentLog().addMacro(pTaken, pTakenBody)
 
           val newChunk = ch.withPerm(PermMinus(ch.perm, pTaken))
@@ -274,9 +260,7 @@ object moreCompleteExhaleSupporter extends SymbolicExecutionRules with Immutable
       }
       val newHeap = Heap(allChunks)
 
-      val s0 = s.copy(functionRecorder = currentFunctionRecorder)
-
-      summarise(s0, relevantChunks, resource, args, v)((s1, snap, _, _, v1) =>
+      summarise(s, relevantChunks, resource, args, v)((s1, snap, _, _, v1) =>
         if (!moreNeeded) {
           if (!consumeExact) {
             v1.decider.assume(PermLess(perms, pSum))

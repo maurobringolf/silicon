@@ -421,37 +421,8 @@ class FunctionData(val programFunction: ast.Function,
   private[functions] def getFreshArps: InsertionOrderedSet[Var] = freshArps.map(_._1)
   private[functions] def getFreshSymbolsAcrossAllPhases: InsertionOrderedSet[Decl] = freshSymbolsAcrossAllPhases
 
-  private[functions] def advancePhase(recorders: Seq[FunctionRecorder]): Unit = {
+  private[functions] def advancePhase(): Unit = {
     assert(0 <= phase && phase <= 1, s"Cannot advance from phase $phase")
-
-    val mergedFunctionRecorder: FunctionRecorder =
-      if (recorders.isEmpty)
-        NoopFunctionRecorder
-      else
-        recorders.tail.foldLeft(recorders.head)((summaryRec, nextRec) => summaryRec.merge(nextRec))
-
-    locToSnap = mergedFunctionRecorder.locToSnap
-    fappToSnap = mergedFunctionRecorder.fappToSnap
-    freshFvfsAndDomains = mergedFunctionRecorder.freshFvfsAndDomains
-    freshFieldInvs = mergedFunctionRecorder.freshFieldInvs
-    freshArps = mergedFunctionRecorder.freshArps
-    freshSnapshots = mergedFunctionRecorder.freshSnapshots
-    freshPathSymbols = mergedFunctionRecorder.freshPathSymbols
-    freshMacros = mergedFunctionRecorder.freshMacros
-
-    freshSymbolsAcrossAllPhases ++= freshPathSymbols map FunctionDecl
-    freshSymbolsAcrossAllPhases ++= freshArps.map(pair => FunctionDecl(pair._1))
-    freshSymbolsAcrossAllPhases ++= freshSnapshots map FunctionDecl
-    freshSymbolsAcrossAllPhases ++= freshFieldInvs.flatMap(_.inverses map FunctionDecl)
-    freshSymbolsAcrossAllPhases ++= freshMacros
-
-    freshSymbolsAcrossAllPhases ++= freshFvfsAndDomains map (fvfDef =>
-      fvfDef.sm match {
-        case x: Var => ConstDecl(x)
-        case App(f: Function, _) => FunctionDecl(f)
-        case other => sys.error(s"Unexpected SM $other of type ${other.getClass.getSimpleName}")
-      })
-
     phase += 1
   }
 

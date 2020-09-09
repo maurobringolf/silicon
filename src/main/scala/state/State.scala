@@ -13,7 +13,6 @@ import viper.silicon.common.collections.immutable.InsertionOrderedSet
 import viper.silicon.decider.RecordedPathConditions
 import viper.silicon.state.State.OldHeaps
 import viper.silicon.state.terms.{Term, Var}
-import viper.silicon.supporters.functions.{FunctionRecorder, NoopFunctionRecorder}
 import viper.silicon.{Map, Stack}
 
 final case class State(g: Store = Store(),
@@ -32,7 +31,6 @@ final case class State(g: Store = Store(),
                        quantifiedVariables: Stack[Var] = Nil,
                        retrying: Boolean = false,
                        underJoin: Boolean = false,
-                       functionRecorder: FunctionRecorder = NoopFunctionRecorder,
                        conservingSnapshotGeneration: Boolean = false,
                        recordPossibleTriggers: Boolean = false,
                        possibleTriggers: Map[ast.Exp, Term] = Map(),
@@ -100,13 +98,8 @@ final case class State(g: Store = Store(),
   def preserveAfterLocalEvaluation(post: State): State =
     State.preserveAfterLocalEvaluation(this, post)
 
-  def functionRecorderQuantifiedVariables(): Seq[Var] =
-    functionRecorder.data.fold(Seq.empty[Var])(_.arguments)
-
-  def relevantQuantifiedVariables(filterPredicate: Var => Boolean): Seq[Var] = (
-       functionRecorderQuantifiedVariables()
-    ++ quantifiedVariables.filter(filterPredicate)
-  )
+  def relevantQuantifiedVariables(filterPredicate: Var => Boolean): Seq[Var] =
+    quantifiedVariables.filter(filterPredicate)
 
   def relevantQuantifiedVariables(occurringIn: Seq[Term]): Seq[Var] =
     relevantQuantifiedVariables(x => occurringIn.exists(_.contains(x)))
@@ -137,7 +130,6 @@ object State {
                  quantifiedVariables1,
                  retrying1,
                  underJoin1,
-                 functionRecorder1,
                  conservingSnapshotGeneration1,
                  recordPossibleTriggers1, possibleTriggers1,
                  triggerExp1,
@@ -159,7 +151,6 @@ object State {
                      `quantifiedVariables1`,
                      `retrying1`,
                      `underJoin1`,
-                     functionRecorder2,
                      `conservingSnapshotGeneration1`,
                      `recordPossibleTriggers1`, possibleTriggers2,
                      triggerExp2,
@@ -171,7 +162,6 @@ object State {
                      `qpFields1`, `qpPredicates1`, `qpMagicWands1`, smCache2, pmCache2, `smDomainNeeded1`,
                      `predicateSnapMap1`, `predicateFormalVarMap1`, `hack`) =>
 
-            val functionRecorder3 = functionRecorder1.merge(functionRecorder2)
             val triggerExp3 = triggerExp1 && triggerExp2
             val possibleTriggers3 = possibleTriggers1 ++ possibleTriggers2
             val constrainableARPs3 = constrainableARPs1 ++ constrainableARPs2
@@ -181,8 +171,7 @@ object State {
 
             val ssCache3 = ssCache1 ++ ssCache2
 
-            s1.copy(functionRecorder = functionRecorder3,
-                    possibleTriggers = possibleTriggers3,
+            s1.copy(possibleTriggers = possibleTriggers3,
                     triggerExp = triggerExp3,
                     constrainableARPs = constrainableARPs3,
                     ssCache = ssCache3,
@@ -196,8 +185,7 @@ object State {
   }
 
   def preserveAfterLocalEvaluation(pre: State, post: State): State = {
-    pre.copy(functionRecorder = post.functionRecorder,
-             possibleTriggers = post.possibleTriggers,
+    pre.copy(possibleTriggers = post.possibleTriggers,
              smCache = post.smCache,
              constrainableARPs = post.constrainableARPs)
   }

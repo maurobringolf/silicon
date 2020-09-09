@@ -400,7 +400,9 @@ object quantifiedChunkSupporter extends QuantifiedChunkSupport with Immutable {
                               v: Verifier)
                              : (Term, Seq[Quantification], Option[Quantification]) = {
 
-    val additionalFvfArgs = s.functionRecorderQuantifiedVariables()
+    // TODO: What was this for?
+    val additionalFvfArgs = Seq()
+      //s.functionRecorderQuantifiedVariables()
     val sm = freshSnapshotMap(s, field, additionalFvfArgs, v)
 
     val smDomainDefinitionCondition = optSmDomainDefinitionCondition.getOrElse(True())
@@ -459,7 +461,9 @@ object quantifiedChunkSupporter extends QuantifiedChunkSupport with Immutable {
 
     // TODO: Consider if axioms can be simplified in case codomainQVars is empty
 
-    val additionalFvfArgs = s.functionRecorderQuantifiedVariables()
+    // TODO: What was this for?
+    val additionalFvfArgs = Seq()
+      //s.functionRecorderQuantifiedVariables()
     val sm = freshSnapshotMap(s, resource, additionalFvfArgs, v)
 
     val qvar = v.decider.fresh("l", sorts.Loc)
@@ -856,7 +860,6 @@ object quantifiedChunkSupporter extends QuantifiedChunkSupport with Immutable {
     v.decider.assume(tSnap === smDef1.sm)
     val s1 =
       s.copy(h = h1,
-             functionRecorder = s.functionRecorder.recordFieldInv(inv),
              conservedPcs = conservedPcs,
              smCache = smCache1)
     Q(s1, v)
@@ -903,7 +906,6 @@ object quantifiedChunkSupporter extends QuantifiedChunkSupport with Immutable {
     val smDef2 = SnapshotMapDefinition(resource, sm, Seq(smValueDef), Seq())
     val s1 = s.copy(h = h1,
                     conservedPcs = conservedPcs,
-                    functionRecorder = s.functionRecorder.recordFvfAndDomain(smDef2),
                     smCache = smCache1)
     Q(s1, v)
   }
@@ -1089,10 +1091,7 @@ object quantifiedChunkSupporter extends QuantifiedChunkSupport with Immutable {
                   val (smDef2, smCache2) =
                     quantifiedChunkSupporter.summarisingSnapshotMap(
                       s2, resource, formalQVars, relevantChunks, v, optSmDomainDefinitionCondition2)
-                  val fr3 = s2.functionRecorder.recordFvfAndDomain(smDef2)
-                                               .recordFieldInv(inverseFunctions)
-                  val s3 = s2.copy(functionRecorder = fr3,
-                                   partiallyConsumedHeap = Some(h3),
+                  val s3 = s2.copy(partiallyConsumedHeap = Some(h3),
                                    constrainableARPs = s.constrainableARPs,
                                    smCache = smCache2)
                   Q(s3, h3, this.embedIntoPHeap(resource, smDef2.sm), v)
@@ -1164,8 +1163,7 @@ object quantifiedChunkSupporter extends QuantifiedChunkSupport with Immutable {
         val consumedChunk =
           quantifiedChunkSupporter.createSingletonQuantifiedChunk(
             codomainQVars, resource, arguments, permsTaken, smDef1.sm)
-        val s3 = s2.copy(functionRecorder = s2.functionRecorder.recordFvfAndDomain(smDef1),
-                         smCache = smCache1)
+        val s3 = s2.copy(smCache = smCache1)
         (result, s3, h2, Some(consumedChunk))
       })((s4, optCh, v2) =>
         optCh match {
@@ -1207,8 +1205,7 @@ object quantifiedChunkSupporter extends QuantifiedChunkSupport with Immutable {
               optSmDomainDefinitionCondition = if (s1.smDomainNeeded) Some(True()) else None,
               optQVarsInstantiations = Some(arguments),
               v = v)
-          val s2 = s1.copy(functionRecorder = s1.functionRecorder.recordFvfAndDomain(smDef1),
-                           smCache = smCache1)
+          val s2 = s1.copy(smCache = smCache1)
           val snapVal = ResourceLookup(resource, smDef1.sm, arguments)
           val snap = resource match {
             case field: ast.Field => PHeapSingletonField(field.name, arguments.head, snapVal)
@@ -1251,7 +1248,6 @@ object quantifiedChunkSupporter extends QuantifiedChunkSupport with Immutable {
     v.decider.prover.comment("Precomputing data for removing quantified permissions")
 
     val additionalArgs = s.relevantQuantifiedVariables
-    var currentFunctionRecorder = s.functionRecorder
 
     val precomputedData = candidates map { ch =>
       val permsProvided = ch.perm
@@ -1261,7 +1257,6 @@ object quantifiedChunkSupporter extends QuantifiedChunkSupport with Immutable {
       val permsTakenMacro = Macro(permsTakenDecl.id, permsTakenDecl.args.map(_.sort), permsTakenDecl.body.sort)
       val permsTaken = App(permsTakenMacro, permsTakenArgs)
 
-      currentFunctionRecorder = currentFunctionRecorder.recordFreshMacro(permsTakenDecl)
       SymbExLogger.currentLog().addMacro(permsTaken, permsTakenBody)
 
       permsNeeded = PermMinus(permsNeeded, permsTaken)
@@ -1324,7 +1319,7 @@ object quantifiedChunkSupporter extends QuantifiedChunkSupport with Immutable {
 
     v.decider.prover.comment("Done removing quantified permissions")
 
-    (success, s.copy(functionRecorder = currentFunctionRecorder), remainingChunks)
+    (success, s, remainingChunks)
   }
 
   private def createPermissionConstraintAndDepletedCheck(codomainQVars: Seq[Var], /* rs := r_1, ..., r_m */
