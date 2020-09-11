@@ -143,11 +143,16 @@ object producer extends ProductionRules with Immutable {
       if (as.tail.isEmpty)
         wrappedProduceTlc(s, snap, a, pve, v)(Q)
       else {
-        val h1 = v.decider.appliedFresh("produced", sorts.PHeap, s.quantifiedVariables)
-        val h2 = v.decider.appliedFresh("produced", sorts.PHeap, s.quantifiedVariables)
-
-        v.decider.assume(Equals(snap, PHeapCombine(h1,h2)))
-
+        val (h1,h2) = (s.conservingSnapshotGeneration, snap) match {
+          case (true, PHeapCombine(snap1, snap2)) => 
+            (snap1,snap2)
+          case _ =>
+            val h1 = v.decider.appliedFresh("produced", sorts.PHeap, s.quantifiedVariables)
+            val h2 = v.decider.appliedFresh("produced", sorts.PHeap, s.quantifiedVariables)
+            v.decider.assume(Equals(snap, PHeapCombine(h1,h2)))
+            (h1,h2)
+        }
+        
         wrappedProduceTlc(s, h1, a, pve, v)((s1, v1) =>
           produceTlcs(s1, h2, as.tail, pves.tail, v1)(Q))
       }
