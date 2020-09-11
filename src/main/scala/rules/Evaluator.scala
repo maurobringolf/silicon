@@ -215,8 +215,8 @@ object evaluator extends EvaluationRules with Immutable {
                     Q(s2, fvfLookup, v1)}
               }
             case _ =>
-              val (smDef1, smCache1) =
-                quantifiedChunkSupporter.summarisingSnapshotMap(
+              val (s2, smDef1, pmDef1) =
+                quantifiedChunkSupporter.heapSummarisingMaps(
                   s = s1,
                   resource = fa.field,
                   codomainQVars = Seq(`?r`),
@@ -230,17 +230,15 @@ object evaluator extends EvaluationRules with Immutable {
                 if (s1.triggerExp) {
                   True()
                 } else {
-                  val totalPermissions = smCache1.get((fa.field, relevantChunks)).get._2
-                    /* TODO: Have totalPermissions returned by quantifiedChunkSupporter.summarisingSnapshotMap */
-                  IsPositive(totalPermissions.replace(`?r`, tRcvr))
+                  val totalPermissions = PermLookup(fa.field.name, pmDef1.pm, tRcvr)
+                  IsPositive(totalPermissions)
                 }
               v1.decider.assert(permCheck) {
                 case false =>
                   createFailure(pve dueTo InsufficientPermission(fa), v1, s1)
                 case true =>
                   val smLookup = Lookup(fa.field.name, smDef1.sm, tRcvr)
-                  val s2 = s1.copy(smCache = smCache1)
-                  Q(s2, smLookup, v1)}
+                  Q(s1, smLookup, v1)}
               }})
 
       case fa: ast.FieldAccess =>
