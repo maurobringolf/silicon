@@ -627,7 +627,7 @@ object quantifiedChunkSupporter extends QuantifiedChunkSupport with Immutable {
                              codomainQVars: Seq[Var],
                              relevantChunks: Seq[QuantifiedBasicChunk],
                              v: Verifier,
-                             optSmDomainDefinitionCondition: Option[Term] = Some(True()),
+                             optSmDomainDefinitionCondition: Option[Term] = None,
                              optQVarsInstantiations: Option[Seq[Term]] = None)
                             : (SnapshotMapDefinition, SnapshotMapCache) = {
 
@@ -853,11 +853,38 @@ object quantifiedChunkSupporter extends QuantifiedChunkSupport with Immutable {
       quantifiedChunkSupporter.splitHeap[QuantifiedBasicChunk](h1, ch.id)
     val (smDef1, smCache1) =
       quantifiedChunkSupporter.summarisingSnapshotMap(
-        s, resource, codomainVars, relevantChunks, v, Some(condOfInv))
+        s, resource, codomainVars, relevantChunks, v)
     val trigger = ResourceTriggerFunction(resource, smDef1.sm, codomainVars)
     v.decider.assume(Forall(codomainVars, Implies(condOfInv, trigger), Trigger(inv.inversesOf(codomainVars)))) //effectiveTriggers map (t => Trigger(t.p map (_.replace(qvarsToInv))))))
 
     v.decider.assume(tSnap === smDef1.sm)
+    /**
+     * [2020-09-10 Mauro]
+     *
+     * TODO: It would be better to add something to the summarization axioms instead of this hack.
+     * 
+     * Semantic snapshots require the domain of the snapshotmap to be known,
+     * so I originally added in 'Some(condOfInv)' to this line above:
+
+       summarisingSnapshotMap(s, resource, codomainVars, relevantChunks, v)
+
+     * However, when evaluating a field trigger this condition is not known and thus it will not hit the cache anymore,
+     * but before without the condition it did. Interestingly, this results in new incompletenesses which surface in
+     * 'examples/graph-marking/graph-marking.vpr' and 'all/assume/10QPpred.vpr'.
+     * For some reason unclear to me at this point, using a new summarised snapshot map instead of a cached one breaks the field trigger mechanism.
+     **/
+    val codomainVarsInDomain = resource match {
+      case field: ast.Field => SetIn(codomainVars.head, Domain(field.name, tSnap))
+      case predicate: ast.Predicate => SetIn(PHeapPredicateLoc(predicate.name, codomainVars), PHeapPredicateDomain(predicate.name, tSnap))
+      case mw: ast.MagicWand => sys.error("QPMW not implemented.")
+    }
+    v.decider.assume(Forall( codomainVars
+                           , Iff(codomainVarsInDomain, condOfInv)
+                           , if (Verifier.config.disableISCTriggers()) Nil else Seq(Trigger(codomainVarsInDomain))
+                           , "test"
+                           , isGlobal = true
+                           ))
+
     val s1 =
       s.copy(h = h1,
              conservedPcs = conservedPcs,
