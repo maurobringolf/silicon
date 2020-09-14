@@ -98,7 +98,7 @@ class DefaultPHeapsContributor(preambleReader: PreambleReader[String, String],
     astDecls =
       predicate_loc_inv_func_decls(program.predicates)
     astAxioms =
-      framing_functions(program.predicates, program.fields, program.functions) ++ extensional_equality(program.predicates, program.fields, program.functions) ++
+      extensional_equality(program.predicates, program.fields, program.functions) ++
       predicate_loc_inv_func_axioms(program.predicates)
   }
 
@@ -242,28 +242,6 @@ class DefaultPHeapsContributor(preambleReader: PreambleReader[String, String],
                          , PHeapEqual(lk1, lk2))
                 , Seq(Trigger(Seq(lk1, lk2))))
     )
-  }
-
-  // TODO: Extend the meta syntax as needed to write this in SMT-LIB
-  def framing_functions( predicates: Seq[ast.Predicate]
-                          , fields: Seq[ast.Field]
-                          , functions: Seq[ast.Function]
-                          ): Iterable[Term] = {
-    val h1 = Var(Identifier("h1"), sorts.PHeap)
-    val h2 = Var(Identifier("h2"), sorts.PHeap)
-   
-    functions.map(g => {
-      // TODO: This contains a lot of duplication with the function supporter and relies on its internals.
-      // Somehow make it reuse that code.
-      val argSorts = g.formalArgs.map(x => symbolConverter.toSort(x.typ))
-      val resultSort = symbolConverter.toSort(g.typ)
-      val args = g.formalArgs.map(x => Var(Identifier(x.name), symbolConverter.toSort(x.typ)))
-      val eqAx = Forall( Seq(h1, h2) ++ args
-                      , Implies(PHeapEqual(h1, h2), (App(HeapDepFun(Identifier(g.name ++ "%limited"), sorts.PHeap +: argSorts, resultSort), h1 +: args) === App(HeapDepFun(Identifier(g.name ++ "%limited"), sorts.PHeap +: argSorts, resultSort), h2 +: args)))
-                      , Seq(Trigger(Seq( App(HeapDepFun(Identifier(g.name ++ "%limited"), sorts.PHeap +: argSorts, resultSort), h1 +: args)
-                                       , App(HeapDepFun(Identifier(g.name ++ "%limited"), sorts.PHeap +: argSorts, resultSort), h2 +: args)))))
-      eqAx
-    })
   }
 
   def predicateSingletonFieldDomains(predicates: Seq[ast.Predicate], fields: Seq[ast.Field]): Iterable[PreambleBlock] = {

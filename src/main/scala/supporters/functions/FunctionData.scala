@@ -78,6 +78,7 @@ class FunctionData(val programFunction: ast.Function,
   val formalResult = Var(identifierFactory.fresh(programFunction.result.name),
                          symbolConverter.toSort(programFunction.result.typ))
 
+  // TODO: Get rid of 'arguments' or explain why we need two
   val arguments = Seq(`?h`) ++ formalArgs.values
   val axiomArguments = functionSupporter.axiomSnapshotVariable +: axiomFormalArgs.values.toSeq
 
@@ -96,10 +97,17 @@ class FunctionData(val programFunction: ast.Function,
   val triggerAxiom =
     Forall(axiomArguments, triggerFunctionApplication, Trigger(limitedFunctionApplication), s"triggerAxiom [${function.id.name}]")
 
-  // TODO: Use Resource ast type instead of general K type parameter
-  // Maps a resource to a Boolean term parametrized by the receiver
-  // e.g. If field f maps to function g, then g(x):Bool is a Term describing the condition under
-  // which (x:Ref) is in the f-domain of the function.
+  val framingAxiom = {
+    val h1 = Var(Identifier("h1"), sorts.PHeap)
+    val h2 = Var(Identifier("h2"), sorts.PHeap)
+
+    val args = axiomArguments.tail
+    Forall( h1 +: h2 +: args
+          , Implies(PHeapEqual(h1, h2), (App(limitedFunction, h1 +: args) === App(limitedFunction, h2 +: args)))
+          , Seq(Trigger(Seq( App(limitedFunction, h1 +: args)
+                           , App(limitedFunction, h2 +: args)))))
+  }
+
   type DomMap = Map[ast.Resource, Term => Term]
 
   def translatePreconditionToDomain(pre: ast.Exp): Option[Term] = pre match {
