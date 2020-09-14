@@ -216,8 +216,8 @@ class DefaultPHeapsContributor(preambleReader: PreambleReader[String, String],
     val equalOnFields = fields.foldLeft[Term](True())((ax, f) => And(ax, equalOnField(f, h1, h2)))
 
     Seq(Forall( Seq(h1, h2)
-          , Implies(And(equalOnFields, equalOnPredicates), App(pHeap_equal, Seq(h1, h2)))
-          , Trigger(App(pHeap_equal, Seq(h1, h2)))))
+          , Implies(And(equalOnFields, equalOnPredicates), PHeapEqual(h1,h2))
+          , Trigger(PHeapEqual(h1, h2))))
   }
 
   private def equalOnField(f: ast.Field, h1: Term, h2: Term) : Term = {
@@ -239,13 +239,10 @@ class DefaultPHeapsContributor(preambleReader: PreambleReader[String, String],
     And( SetEqual(PHeapPredicateDomain(p.name, h1), PHeapPredicateDomain(p.name, h2))
         , Forall( Seq(l)
                 , Implies( SetIn(l, PHeapPredicateDomain(p.name, h1))
-                        , App(pHeap_equal, Seq(lk1, lk2)))
+                         , PHeapEqual(lk1, lk2))
                 , Seq(Trigger(Seq(lk1, lk2))))
     )
   }
-
-  // TODO: Add meta term for this
-  private val pHeap_equal = Fun(Identifier("PHeap.equal"), Seq(sorts.PHeap, sorts.PHeap), sorts.Bool)
 
   // TODO: Extend the meta syntax as needed to write this in SMT-LIB
   def framing_functions( predicates: Seq[ast.Predicate]
@@ -262,7 +259,7 @@ class DefaultPHeapsContributor(preambleReader: PreambleReader[String, String],
       val resultSort = symbolConverter.toSort(g.typ)
       val args = g.formalArgs.map(x => Var(Identifier(x.name), symbolConverter.toSort(x.typ)))
       val eqAx = Forall( Seq(h1, h2) ++ args
-                      , Implies(App(pHeap_equal, Seq(h1, h2)), (App(HeapDepFun(Identifier(g.name ++ "%limited"), sorts.PHeap +: argSorts, resultSort), h1 +: args) === App(HeapDepFun(Identifier(g.name ++ "%limited"), sorts.PHeap +: argSorts, resultSort), h2 +: args)))
+                      , Implies(PHeapEqual(h1, h2), (App(HeapDepFun(Identifier(g.name ++ "%limited"), sorts.PHeap +: argSorts, resultSort), h1 +: args) === App(HeapDepFun(Identifier(g.name ++ "%limited"), sorts.PHeap +: argSorts, resultSort), h2 +: args)))
                       , Seq(Trigger(Seq( App(HeapDepFun(Identifier(g.name ++ "%limited"), sorts.PHeap +: argSorts, resultSort), h1 +: args)
                                        , App(HeapDepFun(Identifier(g.name ++ "%limited"), sorts.PHeap +: argSorts, resultSort), h2 +: args)))))
       eqAx
