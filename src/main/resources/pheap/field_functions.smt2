@@ -1,6 +1,15 @@
 (declare-fun PHeap.lookup_$FLD$ (PHeap $Ref) $S$)
 (declare-fun PHeap.dom_$FLD$ (PHeap) Set<$Ref>)
 
+
+(assert (forall ((x $Ref) (lhs PHeap) (rhs PHeap)) (!
+	(= (PHeap.lookup_$FLD$ (PHeap.MWS lhs rhs) x) (PHeap.lookup_$FLD$ rhs x))
+	:pattern (PHeap.lookup_$FLD$ (PHeap.MWS lhs rhs) x))))
+
+(assert (forall ((lhs PHeap) (rhs PHeap)) (!
+	(= (PHeap.dom_$FLD$ (PHeap.MWS lhs rhs)) (PHeap.dom_$FLD$ rhs))
+	:pattern (PHeap.dom_$FLD$ (PHeap.MWS lhs rhs)))))
+
 (declare-fun PHeap.singleton_$FLD$ ($Ref $S$) PHeap)
 (assert (forall ((x $Ref) (v $S$)) (!
 	(= (PHeap.dom_$FLD$ (PHeap.singleton_$FLD$ x v)) (Set_singleton x))

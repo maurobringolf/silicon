@@ -54,7 +54,7 @@ trait EvaluationRules extends SymbolicExecutionRules {
                      name: String,
                      pve: PartialVerificationError,
                      v: Verifier)
-                    (Q: (State, Seq[Var], Seq[Term], Seq[Term], Seq[Trigger], (Seq[Quantification], Seq[Quantification]), Verifier) => VerificationResult)
+                    (Q: (State, Seq[Var], Seq[Term], Seq[Term], Seq[Trigger], (Seq[Term], Seq[Quantification]), Verifier) => VerificationResult)
                     : VerificationResult
 }
 
@@ -182,8 +182,7 @@ object evaluator extends EvaluationRules with Immutable {
          *       term returned by eval, mark as constrainable on client-side (e.g. in consumer).
          */
         val s1 =
-          s.copy(functionRecorder = s.functionRecorder.recordArp(tVar, tConstraints))
-           .setConstrainable(Seq(tVar), true)
+          s.setConstrainable(Seq(tVar), true)
         Q(s1, tVar, v)
 
       case fa: ast.FieldAccess if s.qpFields.contains(fa.field) =>
@@ -205,22 +204,19 @@ object evaluator extends EvaluationRules with Immutable {
               v1.decider.assume(trigger)
               if (s1.triggerExp) {
                 val fvfLookup = Lookup(fa.field.name, fvfDef.sm, tRcvr)
-                val fr1 = s1.functionRecorder.recordSnapshot(fa, v1.decider.pcs.branchConditions, fvfLookup)
-                val s2 = s1.copy(functionRecorder = fr1)
-                Q(s2, fvfLookup, v1)
+                Q(s1, fvfLookup, v1)
               } else {
                 v1.decider.assert(IsPositive(totalPermissions.replace(`?r`, tRcvr))) {
                   case false =>
                     createFailure(pve dueTo InsufficientPermission(fa), v1, s1)
                   case true =>
                     val fvfLookup = Lookup(fa.field.name, fvfDef.sm, tRcvr)
-                    val fr1 = s1.functionRecorder.recordSnapshot(fa, v1.decider.pcs.branchConditions, fvfLookup).recordFvfAndDomain(fvfDef)
-                    val s2 = s1.copy(functionRecorder = fr1, possibleTriggers = if (s1.recordPossibleTriggers) s1.possibleTriggers + (fa -> trigger) else s1.possibleTriggers)
+                    val s2 = s1.copy(possibleTriggers = if (s1.recordPossibleTriggers) s1.possibleTriggers + (fa -> trigger) else s1.possibleTriggers)
                     Q(s2, fvfLookup, v1)}
               }
             case _ =>
-              val (smDef1, smCache1) =
-                quantifiedChunkSupporter.summarisingSnapshotMap(
+              val (s2, smDef1, pmDef1) =
+                quantifiedChunkSupporter.heapSummarisingMaps(
                   s = s1,
                   resource = fa.field,
                   codomainQVars = Seq(`?r`),
@@ -234,21 +230,15 @@ object evaluator extends EvaluationRules with Immutable {
                 if (s1.triggerExp) {
                   True()
                 } else {
-                  val totalPermissions = smCache1.get((fa.field, relevantChunks)).get._2
-                    /* TODO: Have totalPermissions returned by quantifiedChunkSupporter.summarisingSnapshotMap */
-                  IsPositive(totalPermissions.replace(`?r`, tRcvr))
+                  val totalPermissions = PermLookup(fa.field.name, pmDef1.pm, tRcvr)
+                  IsPositive(totalPermissions)
                 }
               v1.decider.assert(permCheck) {
                 case false =>
                   createFailure(pve dueTo InsufficientPermission(fa), v1, s1)
                 case true =>
                   val smLookup = Lookup(fa.field.name, smDef1.sm, tRcvr)
-                  val fr2 =
-                    s1.functionRecorder.recordSnapshot(fa, v1.decider.pcs.branchConditions, smLookup)
-                                       .recordFvfAndDomain(smDef1)
-                  val s2 = s1.copy(functionRecorder = fr2,
-                                   smCache = smCache1)
-                  Q(s2, smLookup, v1)}
+                  Q(s1, smLookup, v1)}
               }})
 
       case fa: ast.FieldAccess =>
@@ -256,8 +246,7 @@ object evaluator extends EvaluationRules with Immutable {
           val ve = pve dueTo InsufficientPermission(fa)
           val resource = fa.res(Verifier.program)
           chunkSupporter.lookup(s1, s1.h, resource, tArgs, ve, v1)((s2, h2, tSnap, v2) => {
-            val fr = s2.functionRecorder.recordSnapshot(fa, v2.decider.pcs.branchConditions, tSnap)
-            val s3 = s2.copy(h = h2, functionRecorder = fr)
+            val s3 = s2.copy(h = h2)
             Q(s3, tSnap, v1)
           })
         })
@@ -276,7 +265,7 @@ object evaluator extends EvaluationRules with Immutable {
       case old @ ast.LabelledOld(e0, lbl) =>
         s.oldHeaps.get(lbl) match {
           case None =>
-            Failure(pve dueTo LabelledStateNotReached(old))
+            createFailure(pve dueTo LabelledStateNotReached(old), v, s)
           case _ =>
             evalInOldState(s, lbl, e0, pve, v)(Q)}
 
@@ -588,8 +577,17 @@ object evaluator extends EvaluationRules with Immutable {
 
             val tAuxProj = tAux.flatMap(makeTriggersHeapIndependent(_:Quantification, v1.decider.fresh))
 
-            val tlqGlobal = tAuxGlobal flatMap (q1 => q1.deepCollect {case q2: Quantification if !q2.existsDefined {case v: Var if q1.vars.contains(v) => } => q2})
-            val tlq = tAux flatMap (q1 => q1.deepCollect {case q2: Quantification if !q2.existsDefined {case v: Var if q1.vars.contains(v) => } => q2})
+            // TODO: Extracted top-level quantifications (tlqGlobal) are currently assumed twice:
+            //       once directly (tlqGlobal), once nested (tAuxGlobal). It would be better to remove the nested
+            //       instances, e.g. by replacing them with "true".
+
+            val tlqGlobal: Seq[Quantification] = tAuxGlobal flatMap {
+              case q1: Quantification => q1.deepCollect {case q2: Quantification if !q2.existsDefined {case v: Var if q1.vars.contains(v) => } => q2}
+              case _ => Seq.empty
+            }
+
+            val tlq: Seq[Quantification] = tAux flatMap (q1 =>
+              q1.deepCollect {case q2: Quantification if !q2.existsDefined {case v: Var if q1.vars.contains(v) => } => q2})
 
             v1.decider.prover.comment("Nested auxiliary terms: globals (aux)")
             v1.decider.assume(tAuxGlobal)
@@ -649,39 +647,12 @@ object evaluator extends EvaluationRules with Immutable {
                 reasonOffendingNode.replace(formalsToActuals)), exampleTrafo)
             val s3 = s2.copy(g = Store(fargs.zip(tArgs)),
                              recordVisited = true,
-                             functionRecorder = s2.functionRecorder.changeDepthBy(+1),
-                                /* Temporarily disable the recorder: when recording (to later on
-                                 * translate a particular function fun) and a function application
-                                 * fapp is hit, then there is no need to record any information
-                                 * about assertions from fapp's precondition since the latter is not
-                                 * translated as part of the translation of fun.
-                                 * Recording such information is even potentially harmful if formals
-                                 * are not syntactically replaced by actuals but rather bound to
-                                 * them via the store. Consider the following function:
-                                 *   function fun(x: Ref)
-                                 *     requires foo(x) // foo is another function
-                                 *     ...
-                                 *   { ... fun(x.next) ...}
-                                 * For fun(x)'s precondition, a mapping from foo(x) to a snapshot is
-                                 * recorded. When fun(x.next) is hit, its precondition is consumed,
-                                 * but without substituting actuals for formals, continuing to
-                                 * record mappings would add another mapping from foo(x) (which is
-                                 * actually foo(x.next)) to some potentially different snapshot.
-                                 * When translating fun(x) to an axiom, the snapshot of foo(x) from
-                                 * fun(x)'s precondition will be the branch-condition-dependent join
-                                 * of the recorded snapshots - which is wrong (probably only
-                                 * incomplete).
-                                 */
                              smDomainNeeded = true)
             consumes(s3, pres, _ => pvePre, v2)((s4, snap, v3) => {
               val tFApp = App(v3.symbolConverter.toFunction(func), snap :: tArgs)
-              val fr5 =
-                s4.functionRecorder.changeDepthBy(-1)
-                                   .recordSnapshot(fapp, v3.decider.pcs.branchConditions, snap)
               val s5 = s4.copy(g = s2.g,
                                h = s2.h,
                                recordVisited = s2.recordVisited,
-                               functionRecorder = fr5,
                                smDomainNeeded = s2.smDomainNeeded,
                                hackIssue387DisablePermissionConsumption = s.hackIssue387DisablePermissionConsumption)
               QB(s5, tFApp, v3)})
@@ -712,11 +683,7 @@ object evaluator extends EvaluationRules with Immutable {
 //                        eval(σ1, eIn, pve, c4)((tIn, c5) =>
 //                          QB(tIn, c5))})
                     consume(s4, acc, pve, v3)((s5, snap, v4) => {
-                      val fr6 =
-                        s5.functionRecorder.recordSnapshot(pa, v4.decider.pcs.branchConditions, snap)
-                                           .changeDepthBy(+1)
-                      val s6 = s5.copy(functionRecorder = fr6,
-                                       constrainableARPs = s1.constrainableARPs)
+                      val s6 = s5.copy(constrainableARPs = s1.constrainableARPs)
                         /* Recording the unfolded predicate's snapshot is necessary in order to create the
                          * additional predicate-based trigger function applications because these are applied
                          * to the function arguments and the predicate snapshot
@@ -729,7 +696,6 @@ object evaluator extends EvaluationRules with Immutable {
                       val s7a = s7.copy(g = insg)
                       produce(s7a, PHeapLookupPredicate(predicateName, snap, tArgs), body, pve, v4)((s8, v5) => {
                         val s9 = s8.copy(g = s7.g,
-                                         functionRecorder = s8.functionRecorder.changeDepthBy(-1),
                                          recordVisited = s3.recordVisited,
                                          permissionScalingFactor = s6.permissionScalingFactor)
                                    .decCycleCounter(predicate)
@@ -788,9 +754,9 @@ object evaluator extends EvaluationRules with Immutable {
                   case true =>
                     Q(s1, SeqUpdate(t0, t1, t2), v1)
                   case false =>
-                    Failure(pve dueTo SeqIndexExceedsLength(e0, e1))}
+                    createFailure(pve dueTo SeqIndexExceedsLength(e0, e1), v1, s1)}
               case false =>
-                Failure(pve dueTo SeqIndexNegative(e0, e1))
+                createFailure(pve dueTo SeqIndexNegative(e0, e1), v1, s1)
             }
           }
         })
@@ -867,7 +833,7 @@ object evaluator extends EvaluationRules with Immutable {
       /* Unexpected nodes */
 
       case _: ast.InhaleExhaleExp =>
-        Failure(viper.silicon.utils.consistency.createUnexpectedInhaleExhaleExpressionError(e))
+        createFailure(viper.silicon.utils.consistency.createUnexpectedInhaleExhaleExpressionError(e), v, s)
     }
 
     resultTerm
@@ -882,7 +848,7 @@ object evaluator extends EvaluationRules with Immutable {
                      name: String,
                      pve: PartialVerificationError,
                      v: Verifier)
-                    (Q: (State, Seq[Var], Seq[Term], Seq[Term], Seq[Trigger], (Seq[Quantification], Seq[Quantification]), Verifier) => VerificationResult)
+                    (Q: (State, Seq[Var], Seq[Term], Seq[Term], Seq[Trigger], (Seq[Term], Seq[Quantification]), Verifier) => VerificationResult)
                     : VerificationResult = {
 
     val localVars = vars map (_.localVar)
@@ -893,7 +859,7 @@ object evaluator extends EvaluationRules with Immutable {
                     quantifiedVariables = tVars ++ s.quantifiedVariables,
                     recordPossibleTriggers = true,
                     possibleTriggers = Map.empty) // TODO: Why reset possibleTriggers if they are merged with s.possibleTriggers later anyway?
-    type R = (State, Seq[Term], Seq[Term], Seq[Trigger], (Seq[Quantification], Seq[Quantification]), Map[ast.Exp, Term])
+    type R = (State, Seq[Term], Seq[Term], Seq[Trigger], (Seq[Term], Seq[Quantification]), Map[ast.Exp, Term])
     executionFlowController.locallyWithResult[R](s1, v)((s2, v1, QB) => {
        val preMark = v1.decider.setPathConditionMark()
       evals(s2, es1, _ => pve, v1)((s3, ts1, v2) => {
@@ -901,11 +867,11 @@ object evaluator extends EvaluationRules with Immutable {
         v2.decider.setCurrentBranchCondition(bc)
         evals(s3, es2, _ => pve, v2)((s4, ts2, v3) => {
           evalTriggers(s4, optTriggers.getOrElse(Nil), pve, v3)((s5, tTriggers, v4) => { // TODO: v4 isn't forward - problem?
-            val (auxGlobalQuants, auxNonGlobalQuants) =
+            val (auxGlobals, auxNonGlobalQuants) =
               v3.decider.pcs.after(preMark).quantified(quant, tVars, tTriggers, s"$name-aux", isGlobal = false, bc)
             val additionalPossibleTriggers: Map[ast.Exp, Term] =
               if (s.recordPossibleTriggers) s5.possibleTriggers else Map()
-            QB((s5, ts1, ts2, tTriggers, (auxGlobalQuants, auxNonGlobalQuants), additionalPossibleTriggers))})})})
+            QB((s5, ts1, ts2, tTriggers, (auxGlobals, auxNonGlobalQuants), additionalPossibleTriggers))})})})
     }){case (s2, ts1, ts2, tTriggers, (tAuxGlobal, tAux), additionalPossibleTriggers) =>
       val s3 = s.copy(possibleTriggers = s.possibleTriggers ++ additionalPossibleTriggers)
                 .preserveAfterLocalEvaluation(s2)
@@ -1188,7 +1154,6 @@ object evaluator extends EvaluationRules with Immutable {
           Implies(And(entry.pathConditions.branchConditions), joinTerm === entry.data))
 
         var sJoined = entries.tail.foldLeft(entries.head.s)((sAcc, entry) =>sAcc.merge(entry.s))
-        sJoined = sJoined.copy(functionRecorder = sJoined.functionRecorder.recordPathSymbol(joinSymbol))
 
         v.decider.assume(joinDefEqs)
 

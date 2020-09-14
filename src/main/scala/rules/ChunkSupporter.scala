@@ -10,7 +10,7 @@ import scala.reflect.ClassTag
 import viper.silver.ast
 import viper.silver.verifier.VerificationError
 import viper.silicon.interfaces.state._
-import viper.silicon.interfaces.{Failure, Success, VerificationResult}
+import viper.silicon.interfaces.{Success, VerificationResult}
 import viper.silicon.resources.{NonQuantifiedPropertyInterpreter, Resources}
 import viper.silicon.state._
 import viper.silicon.state.terms._
@@ -87,8 +87,7 @@ object chunkSupporter extends ChunkSupportRules with Immutable {
               case _ => sorts.PHeap
             }
             val fresh = v2.decider.fresh(snapSort)
-            val s3 = s2.copy(functionRecorder = s2.functionRecorder.recordFreshSnapshot(fresh.applicable))
-            QS(s3, h2, fresh, v2)
+            QS(s2, h2, fresh, v2)
         })
     })(Q)
   }
@@ -105,7 +104,7 @@ object chunkSupporter extends ChunkSupportRules with Immutable {
 
     val id = ChunkIdentifier(resource, Verifier.program)
     if (s.exhaleExt) {
-      val failure = Failure(ve).withLoad(args)
+      val failure = createFailure(ve, v, s).withLoad(args)
       magicWandSupporter.transfer(s, perms, failure, v)(consumeGreedy(_, _, id, args, _, _))((s1, optCh, v1) =>
         Q(s1, h, optCh.flatMap(ch => Some(ch.snap)), v1))
     } else {
@@ -179,8 +178,8 @@ object chunkSupporter extends ChunkSupportRules with Immutable {
              (Q: (State, Heap, Verifier) => VerificationResult) = {
     // Try to merge the chunk into the heap by finding an alias.
     // In any case, property assumptions are added after the merge step.
-    val (fr1, h1) = stateConsolidator.merge(s.functionRecorder, h, ch, v)
-    Q(s.copy(functionRecorder = fr1), h1, v)
+    val h1 = stateConsolidator.merge(h, ch, v)
+    Q(s, h1, v)
   }
 
   def lookup(s: State,

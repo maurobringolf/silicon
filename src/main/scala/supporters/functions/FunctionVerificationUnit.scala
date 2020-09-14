@@ -158,7 +158,7 @@ trait DefaultFunctionVerificationUnitProvider extends VerifierComponent { v: Ver
 
     private def handleFunction(sInit: State, function: ast.Function): VerificationResult = {
       val data = functionData(function)
-      val s = sInit.copy(functionRecorder = NoopFunctionRecorder, conservingSnapshotGeneration = true)
+      val s = sInit.copy(conservingSnapshotGeneration = true)
 
       /* Phase 1: Check well-definedness of the specifications */
       checkSpecificationWelldefinedness(s, function) match {
@@ -209,7 +209,6 @@ trait DefaultFunctionVerificationUnitProvider extends VerifierComponent { v: Ver
       val s = sInit.copy(g = g, h = Heap(), oldHeaps = OldHeaps())
 
       var phase1Data: Seq[Phase1Data] = Vector.empty
-      var recorders: Seq[FunctionRecorder] = Vector.empty
 
       val result = executionFlowController.locally(s, v)((s0, _) => {
         val preMark = decider.setPathConditionMark()
@@ -220,10 +219,9 @@ trait DefaultFunctionVerificationUnitProvider extends VerifierComponent { v: Ver
           // the postcondition's snapshot structure is most likely different than that of the
           // precondition
           produces(s1, v.decider.fresh(sorts.PHeap), posts, ContractNotWellformed, v)((s2, _) => {
-            recorders :+= s2.functionRecorder
             Success()})})})
 
-      data.advancePhase(recorders)
+      data.advancePhase()
 
       (result, phase1Data)
     }
@@ -240,8 +238,6 @@ trait DefaultFunctionVerificationUnitProvider extends VerifierComponent { v: Ver
       val body = function.body.get /* NOTE: Only non-abstract functions are expected! */
       val postconditionViolated = (offendingNode: ast.Exp) => PostconditionViolated(offendingNode, function)
 
-      var recorders: Seq[FunctionRecorder] = Vector.empty
-
       val result = phase1data.foldLeft(Success(): VerificationResult) {
         case (fatalResult: FatalResult, _) => fatalResult
         case (intermediateResult, Phase1Data(sPre, bcsPre, pcsPre)) =>
@@ -252,10 +248,9 @@ trait DefaultFunctionVerificationUnitProvider extends VerifierComponent { v: Ver
             eval(s1, body, FunctionNotWellformed(function), v)((s2, tBody, _) => {
               decider.assume(data.formalResult === tBody)
               consumes(s2, posts, postconditionViolated, v)((s3, _, _) => {
-                recorders :+= s3.functionRecorder
                 Success()})})})}
 
-      data.advancePhase(recorders)
+      data.advancePhase()
 
       result
     }

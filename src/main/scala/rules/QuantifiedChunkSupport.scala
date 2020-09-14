@@ -12,7 +12,7 @@ import viper.silver.verifier.{ErrorReason, PartialVerificationError}
 import viper.silver.verifier.reasons.{InsufficientPermission, MagicWandChunkNotFound}
 import viper.silicon.{toMap, Map, SymbExLogger}
 import viper.silicon.interfaces.state._
-import viper.silicon.interfaces.{Failure, VerificationResult}
+import viper.silicon.interfaces.VerificationResult
 import viper.silicon.resources.{NonQuantifiedPropertyInterpreter, QuantifiedPropertyInterpreter, Resources}
 import viper.silicon.state._
 import viper.silicon.state.terms._
@@ -400,7 +400,9 @@ object quantifiedChunkSupporter extends QuantifiedChunkSupport with Immutable {
                               v: Verifier)
                              : (Term, Seq[Quantification], Option[Quantification]) = {
 
-    val additionalFvfArgs = s.functionRecorderQuantifiedVariables()
+    // TODO: What was this for?
+    val additionalFvfArgs = Seq()
+      //s.functionRecorderQuantifiedVariables()
     val sm = freshSnapshotMap(s, field, additionalFvfArgs, v)
 
     val smDomainDefinitionCondition = optSmDomainDefinitionCondition.getOrElse(True())
@@ -459,7 +461,9 @@ object quantifiedChunkSupporter extends QuantifiedChunkSupport with Immutable {
 
     // TODO: Consider if axioms can be simplified in case codomainQVars is empty
 
-    val additionalFvfArgs = s.functionRecorderQuantifiedVariables()
+    // TODO: What was this for?
+    val additionalFvfArgs = Seq()
+      //s.functionRecorderQuantifiedVariables()
     val sm = freshSnapshotMap(s, resource, additionalFvfArgs, v)
 
     val qvar = v.decider.fresh("l", sorts.Loc)
@@ -623,7 +627,7 @@ object quantifiedChunkSupporter extends QuantifiedChunkSupport with Immutable {
                              codomainQVars: Seq[Var],
                              relevantChunks: Seq[QuantifiedBasicChunk],
                              v: Verifier,
-                             optSmDomainDefinitionCondition: Option[Term] = Some(True()),
+                             optSmDomainDefinitionCondition: Option[Term] = None,
                              optQVarsInstantiations: Option[Seq[Term]] = None)
                             : (SnapshotMapDefinition, SnapshotMapCache) = {
 
@@ -734,7 +738,7 @@ object quantifiedChunkSupporter extends QuantifiedChunkSupport with Immutable {
               qid: String,
               optTrigger: Option[Seq[ast.Trigger]],
               tTriggers: Seq[Trigger],
-              auxGlobals: Seq[Quantification],
+              auxGlobals: Seq[Term],
               auxNonGlobals: Seq[Quantification],
               tCond: Term,
               tArgs: Seq[Term],
@@ -849,14 +853,40 @@ object quantifiedChunkSupporter extends QuantifiedChunkSupport with Immutable {
       quantifiedChunkSupporter.splitHeap[QuantifiedBasicChunk](h1, ch.id)
     val (smDef1, smCache1) =
       quantifiedChunkSupporter.summarisingSnapshotMap(
-        s, resource, codomainVars, relevantChunks, v, Some(condOfInv))
+        s, resource, codomainVars, relevantChunks, v)
     val trigger = ResourceTriggerFunction(resource, smDef1.sm, codomainVars)
     v.decider.assume(Forall(codomainVars, Implies(condOfInv, trigger), Trigger(inv.inversesOf(codomainVars)))) //effectiveTriggers map (t => Trigger(t.p map (_.replace(qvarsToInv))))))
 
     v.decider.assume(tSnap === smDef1.sm)
+    /**
+     * [2020-09-10 Mauro]
+     *
+     * TODO: It would be better to add something to the summarization axioms instead of this hack.
+     * 
+     * Semantic snapshots require the domain of the snapshotmap to be known,
+     * so I originally added in 'Some(condOfInv)' to this line above:
+
+       summarisingSnapshotMap(s, resource, codomainVars, relevantChunks, v)
+
+     * However, when evaluating a field trigger this condition is not known and thus it will not hit the cache anymore,
+     * but before without the condition it did. Interestingly, this results in new incompletenesses which surface in
+     * 'examples/graph-marking/graph-marking.vpr' and 'all/assume/10QPpred.vpr'.
+     * For some reason unclear to me at this point, using a new summarised snapshot map instead of a cached one breaks the field trigger mechanism.
+     **/
+    val codomainVarsInDomain = resource match {
+      case field: ast.Field => SetIn(codomainVars.head, Domain(field.name, tSnap))
+      case predicate: ast.Predicate => SetIn(PHeapPredicateLoc(predicate.name, codomainVars), PHeapPredicateDomain(predicate.name, tSnap))
+      case mw: ast.MagicWand => sys.error("QPMW not implemented.")
+    }
+    v.decider.assume(Forall( codomainVars
+                           , Iff(codomainVarsInDomain, condOfInv)
+                           , if (Verifier.config.disableISCTriggers()) Nil else Seq(Trigger(codomainVarsInDomain))
+                           , "test"
+                           , isGlobal = true
+                           ))
+
     val s1 =
       s.copy(h = h1,
-             functionRecorder = s.functionRecorder.recordFieldInv(inv),
              conservedPcs = conservedPcs,
              smCache = smCache1)
     Q(s1, v)
@@ -903,7 +933,6 @@ object quantifiedChunkSupporter extends QuantifiedChunkSupport with Immutable {
     val smDef2 = SnapshotMapDefinition(resource, sm, Seq(smValueDef), Seq())
     val s1 = s.copy(h = h1,
                     conservedPcs = conservedPcs,
-                    functionRecorder = s.functionRecorder.recordFvfAndDomain(smDef2),
                     smCache = smCache1)
     Q(s1, v)
   }
@@ -926,7 +955,7 @@ object quantifiedChunkSupporter extends QuantifiedChunkSupport with Immutable {
               qid: String,
               optTrigger: Option[Seq[ast.Trigger]],
               tTriggers: Seq[Trigger],
-              auxGlobals: Seq[Quantification],
+              auxGlobals: Seq[Term],
               auxNonGlobals: Seq[Quantification],
               tCond: Term,
               tArgs: Seq[Term],
@@ -1019,7 +1048,7 @@ object quantifiedChunkSupporter extends QuantifiedChunkSupport with Immutable {
               magicWandSupporter.transfer[QuantifiedBasicChunk](
                                           s.copy(smCache = smCache1),
                                           lossOfInvOfLoc,
-                                          Failure(pve dueTo insufficientPermissionReason/*InsufficientPermission(acc.loc)*/),
+                                          createFailure(pve dueTo insufficientPermissionReason/*InsufficientPermission(acc.loc)*/, v, s),
                                           v)((s2, heap, rPerm, v2) => {
                 val (relevantChunks, otherChunks) =
                   quantifiedChunkSupporter.splitHeap[QuantifiedBasicChunk](
@@ -1089,10 +1118,7 @@ object quantifiedChunkSupporter extends QuantifiedChunkSupport with Immutable {
                   val (smDef2, smCache2) =
                     quantifiedChunkSupporter.summarisingSnapshotMap(
                       s2, resource, formalQVars, relevantChunks, v, optSmDomainDefinitionCondition2)
-                  val fr3 = s2.functionRecorder.recordFvfAndDomain(smDef2)
-                                               .recordFieldInv(inverseFunctions)
-                  val s3 = s2.copy(functionRecorder = fr3,
-                                   partiallyConsumedHeap = Some(h3),
+                  val s3 = s2.copy(partiallyConsumedHeap = Some(h3),
                                    constrainableARPs = s.constrainableARPs,
                                    smCache = smCache2)
                   Q(s3, h3, this.embedIntoPHeap(resource, smDef2.sm), v)
@@ -1119,8 +1145,8 @@ object quantifiedChunkSupporter extends QuantifiedChunkSupport with Immutable {
 
     val resource = resourceAccess.res(Verifier.program)
     val failure = resourceAccess match {
-      case locAcc: ast.LocationAccess => Failure(pve dueTo InsufficientPermission(locAcc))
-      case wand: ast.MagicWand => Failure(pve dueTo MagicWandChunkNotFound(wand))
+      case locAcc: ast.LocationAccess => createFailure(pve dueTo InsufficientPermission(locAcc), v, s)
+      case wand: ast.MagicWand => createFailure(pve dueTo MagicWandChunkNotFound(wand), v, s)
       case _ => sys.error(s"Found resource $resourceAccess, which is not yet supported as a quantified resource.")
     }
     val chunkIdentifier = ChunkIdentifier(resource, Verifier.program)
@@ -1164,8 +1190,7 @@ object quantifiedChunkSupporter extends QuantifiedChunkSupport with Immutable {
         val consumedChunk =
           quantifiedChunkSupporter.createSingletonQuantifiedChunk(
             codomainQVars, resource, arguments, permsTaken, smDef1.sm)
-        val s3 = s2.copy(functionRecorder = s2.functionRecorder.recordFvfAndDomain(smDef1),
-                         smCache = smCache1)
+        val s3 = s2.copy(smCache = smCache1)
         (result, s3, h2, Some(consumedChunk))
       })((s4, optCh, v2) =>
         optCh match {
@@ -1207,8 +1232,7 @@ object quantifiedChunkSupporter extends QuantifiedChunkSupport with Immutable {
               optSmDomainDefinitionCondition = if (s1.smDomainNeeded) Some(True()) else None,
               optQVarsInstantiations = Some(arguments),
               v = v)
-          val s2 = s1.copy(functionRecorder = s1.functionRecorder.recordFvfAndDomain(smDef1),
-                           smCache = smCache1)
+          val s2 = s1.copy(smCache = smCache1)
           val snapVal = ResourceLookup(resource, smDef1.sm, arguments)
           val snap = resource match {
             case field: ast.Field => PHeapSingletonField(field.name, arguments.head, snapVal)
@@ -1251,7 +1275,6 @@ object quantifiedChunkSupporter extends QuantifiedChunkSupport with Immutable {
     v.decider.prover.comment("Precomputing data for removing quantified permissions")
 
     val additionalArgs = s.relevantQuantifiedVariables
-    var currentFunctionRecorder = s.functionRecorder
 
     val precomputedData = candidates map { ch =>
       val permsProvided = ch.perm
@@ -1261,7 +1284,6 @@ object quantifiedChunkSupporter extends QuantifiedChunkSupport with Immutable {
       val permsTakenMacro = Macro(permsTakenDecl.id, permsTakenDecl.args.map(_.sort), permsTakenDecl.body.sort)
       val permsTaken = App(permsTakenMacro, permsTakenArgs)
 
-      currentFunctionRecorder = currentFunctionRecorder.recordFreshMacro(permsTakenDecl)
       SymbExLogger.currentLog().addMacro(permsTaken, permsTakenBody)
 
       permsNeeded = PermMinus(permsNeeded, permsTaken)
@@ -1324,7 +1346,7 @@ object quantifiedChunkSupporter extends QuantifiedChunkSupport with Immutable {
 
     v.decider.prover.comment("Done removing quantified permissions")
 
-    (success, s.copy(functionRecorder = currentFunctionRecorder), remainingChunks)
+    (success, s, remainingChunks)
   }
 
   private def createPermissionConstraintAndDepletedCheck(codomainQVars: Seq[Var], /* rs := r_1, ..., r_m */
