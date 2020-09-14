@@ -9,6 +9,7 @@ package viper.silicon.supporters
 import viper.silver.ast
 import viper.silicon.common.collections.immutable.InsertionOrderedSet
 import viper.silicon.{Config, Map}
+import viper.silicon.rules.predicateSupporter
 import viper.silicon.interfaces.{PreambleContributor, PreambleReader}
 import viper.silicon.interfaces.decider.{ProverLike, TermConverter}
 import viper.silicon.state.SymbolConverter
@@ -179,10 +180,9 @@ class DefaultPHeapsContributor(preambleReader: PreambleReader[String, String],
   def predicate_loc_inv_func_decls(predicates: Seq[ast.Predicate]): Iterable[FunctionDecl] = {
     predicates.flatMap(p => {
       p.formalArgs.zipWithIndex.map({ case (a,i) => 
-        // TODO: Define this in a better place and reuse everywhere
-        val id = s"PHeap.loc_${p.name}_inv_$i"
+        val id = predicateSupporter.inverseLocFunctionId(p.name, i)
         val a_sort = symbolConverter.toSort(a.typ)
-        FunctionDecl(Fun(Identifier(id), Seq(sorts.Loc), a_sort))
+        FunctionDecl(Fun(id, Seq(sorts.Loc), a_sort))
       })
     })
   }
@@ -204,7 +204,6 @@ class DefaultPHeapsContributor(preambleReader: PreambleReader[String, String],
     }))
   }
 
-  // TODO: Extend the meta syntax as needed to write these in SMT-LIB?
   def extensional_equality( predicates: Seq[ast.Predicate]
                           , fields: Seq[ast.Field]
                           , functions: Seq[ast.Function]

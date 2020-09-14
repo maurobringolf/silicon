@@ -9,6 +9,7 @@ package viper.silicon.decider
 import scala.collection.mutable
 import viper.silver.ast.pretty.FastPrettyPrinterBase
 import viper.silver.components.StatefulComponent
+import viper.silicon.rules.predicateSupporter
 import viper.silicon.interfaces.decider.TermConverter
 import viper.silicon.state.{Identifier, SimpleIdentifier, SortBasedIdentifier, SuffixedIdentifier}
 import viper.silicon.state.terms._
@@ -252,7 +253,7 @@ class TermToSMTLib2Converter
         parens(text("PHeap.loc_") <> p <+> args.map(a => convert(a)).mkString(" "))
       }
     }
-    case PHeapPredicateLocInv(p, idx, _, l) => parens(text("PHeap.loc_") <> p <> text("_inv_") <> text(idx.toString) <+> render(l))
+    case PHeapPredicateLocInv(p, idx, _, l) => parens(text(predicateSupporter.inverseLocFunctionId(p, idx).name) <+> render(l))
 
     case PHeapPredicateDomain(p, h) => parens(text("PHeap.dom_") <> p <+> convert(h))
 

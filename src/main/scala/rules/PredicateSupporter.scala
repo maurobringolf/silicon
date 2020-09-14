@@ -43,6 +43,9 @@ object predicateSupporter extends PredicateSupportRules with Immutable {
   import consumer._
   import producer._
 
+  def inverseLocFunctionId(predicateName: String, index: Int) : Identifier =
+    Identifier(s"PHeap.loc_${predicateName}_inv_$index")
+
   def fold(s: State,
            predicate: ast.Predicate,
            tArgs: List[Term],
