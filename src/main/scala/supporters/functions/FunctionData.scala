@@ -552,6 +552,20 @@ class FunctionData(val programFunction: ast.Function,
            Seq(Trigger(functionApplication))
         ++ predicateTriggers.values.map(pt => Trigger(Seq(triggerFunctionApplication, pt))))
 
-      Forall(axiomArguments, body, allTriggers, s"definitionalAxiom [${function.id.name}]")})
+      val predicateTriggerAxioms = predicateTriggers.map({ case (predicate, App(pt, h +: args)) => {
+        val h1 = Var(Identifier("h1"), sorts.PHeap)
+        val h2 = Var(Identifier("h2"), sorts.PHeap)
+        Forall( (h1 +: h2 +: axiomArguments.tail).asInstanceOf[Seq[Var]]
+                      , Implies( App(Fun(Identifier("PHeap.subheap"), Seq(sorts.PHeap, sorts.PHeap), sorts.Bool), Seq(PHeapSingletonPredicate(predicate.name, args, h1), h2))
+                               , App(pt, PHeapLookupPredicate(predicate.name, h2, args) +: args)
+                               )
+                      , Seq(Trigger(Seq(App(pt, h1 +: args), App(limitedFunction, h2 +: axiomArguments.tail))))
+        )
+      }})
+
+      And( Forall(axiomArguments, body, allTriggers, s"definitionalAxiom [${function.id.name}]")
+         +: predicateTriggerAxioms.toSeq
+         )
+    })
   }
 }

@@ -100,6 +100,7 @@ class DefaultPHeapsContributor(preambleReader: PreambleReader[String, String],
     astAxioms =
       //framing_functions(program.predicates, program.fields, program.functions) ++
       extensional_equality(program.predicates, program.fields, program.functions) ++
+      extensional_subheap(program.predicates, program.fields, program.functions) ++
       predicate_loc_inv_func_axioms(program.predicates)
   }
 
@@ -221,6 +222,21 @@ class DefaultPHeapsContributor(preambleReader: PreambleReader[String, String],
           , Trigger(App(pHeap_equal, Seq(h1, h2)))))
   }
 
+  def extensional_subheap( predicates: Seq[ast.Predicate]
+                         , fields: Seq[ast.Field]
+                         , functions: Seq[ast.Function]
+                         ): Iterable[Term] = {
+    val h1 = Var(Identifier("h1"), sorts.PHeap)
+    val h2 = Var(Identifier("h2"), sorts.PHeap)
+
+    val subheapOnPredicates = predicates.foldLeft[Term](True())((ax, p) => And(ax, subheapOnPred(p, h1, h2)))
+    val subheapOnFields = fields.foldLeft[Term](True())((ax, f) => And(ax, subheapOnField(f, h1, h2)))
+
+    Seq( Forall( Seq(h1, h2)
+       , Implies(And(subheapOnFields, subheapOnPredicates), App(pHeap_subheap, Seq(h1, h2)))
+       , Trigger(App(pHeap_subheap, Seq(h1, h2)))))
+  }
+
   private def equalOnField(f: ast.Field, h1: Term, h2: Term) : Term = {
     val r = Var(Identifier("r"), sorts.Ref)
     val fSort = symbolConverter.toSort(f.typ)
@@ -230,6 +246,16 @@ class DefaultPHeapsContributor(preambleReader: PreambleReader[String, String],
                         , PHeapLookupField(f.name, fSort, h1, r) === PHeapLookupField(f.name, fSort, h2, r))
                 , Seq( Trigger(Seq(PHeapLookupField(f.name, fSort, h1, r), PHeapLookupField(f.name, fSort, h2, r))))
                 )
+    )
+  }
+
+  private def subheapOnField(f: ast.Field, h1: Term, h2: Term) : Term = {
+    val r = Var(Identifier("r"), sorts.Ref)
+    val fSort = symbolConverter.toSort(f.typ)
+    Forall( Seq(r)
+      , Implies( SetIn(r, PHeapFieldDomain(f.name, h1))
+               , And(SetIn(r, PHeapFieldDomain(f.name, h2)), PHeapLookupField(f.name, fSort, h1, r) === PHeapLookupField(f.name, fSort, h2, r)))
+      , Seq( Trigger(Seq(PHeapLookupField(f.name, fSort, h1, r), PHeapLookupField(f.name, fSort, h2, r))))
     )
   }
 
@@ -245,8 +271,20 @@ class DefaultPHeapsContributor(preambleReader: PreambleReader[String, String],
     )
   }
 
-  // TODO: Add meta term for this
+  private def subheapOnPred(p: ast.Predicate, h1: Term, h2: Term) : Term = {
+    val l = Var(Identifier("l"), sorts.Loc)
+    val lk1 = App(Fun(Identifier("PHeap.lookup_" ++ p.name), Seq(sorts.PHeap, sorts.Loc), sorts.PHeap), Seq(h1, l))
+    val lk2 = App(Fun(Identifier("PHeap.lookup_" ++ p.name), Seq(sorts.PHeap, sorts.Loc), sorts.PHeap), Seq(h2, l))
+    Forall( Seq(l)
+      , Implies( SetIn(l, PHeapPredicateDomain(p.name, h1))
+               , And(SetIn(l, PHeapPredicateDomain(p.name, h2)), App(pHeap_equal, Seq(lk1, lk2))))
+      , Seq(Trigger(Seq(lk1, lk2)))
+    )
+  }
+
+  // TODO: Add meta term for these
   private val pHeap_equal = Fun(Identifier("PHeap.equal"), Seq(sorts.PHeap, sorts.PHeap), sorts.Bool)
+  private val pHeap_subheap = Fun(Identifier("PHeap.subheap"), Seq(sorts.PHeap, sorts.PHeap), sorts.Bool)
 
   // TODO: Extend the meta syntax as needed to write this in SMT-LIB
   def framing_functions( predicates: Seq[ast.Predicate]

@@ -1,5 +1,6 @@
 (declare-fun PHeap.combine (PHeap PHeap) PHeap)
 (declare-fun PHeap.equal (PHeap PHeap) Bool)
+(declare-fun PHeap.subheap (PHeap PHeap) Bool)
 (declare-const PHeap.emp PHeap)
 
 (declare-fun PHeap.MWS (PHeap PHeap) PHeap)
