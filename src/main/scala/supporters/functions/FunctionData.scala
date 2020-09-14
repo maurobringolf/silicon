@@ -236,10 +236,14 @@ class FunctionData(val programFunction: ast.Function,
       val qs = tFa.asInstanceOf[Quantification].vars
 
       val invs = qs.map(qi => {
-        // TODO: Ideally we would use source position in the name,
-        // such that the assocation is clear. But it seems that with macros
-        // the positions are not maintained? For example the testcase 'quantifiedpermissions/misc/heap_dependent_triggers.vpr'
-        // contains some edge cases.
+        /**
+         * [2020-09-14 Mauro]
+         *
+         * TODO: Ideally we would use source position in the name,
+         * such that the assocation is clear. But it seems that with macros
+         * the positions are not maintained? For example the testcase 'quantifiedpermissions/misc/heap_dependent_triggers.vpr'
+         * contains some edge cases.
+         **/
         val invName = "QPinv_" ++ this.function.id.toString ++ "_" ++ node.getPrettyMetadata._1.toString ++ "_" ++ qi.id.name
 
         val inv = Fun( Identifier(invName)
@@ -282,10 +286,7 @@ class FunctionData(val programFunction: ast.Function,
       val qs = tFa.asInstanceOf[Quantification].vars
 
       val invs = qs.map(qi => {
-        // TODO: Ideally we would use source position in the name,
-        // such that the assocation is clear. But it seems that with macros
-        // the positions are not maintained? For example the testcase 'quantifiedpermissions/misc/heap_dependent_triggers.vpr'
-        // contains some edge cases.
+        // TODO: See note above in quantified field assertion case
         val invName = "QPinv_" ++ this.function.id.toString ++ "_" ++ node.getPrettyMetadata._1.toString ++ "_" ++ qi.id.name
 
         val inv = Fun( Identifier(invName)
@@ -343,11 +344,6 @@ class FunctionData(val programFunction: ast.Function,
           And(Greater(tp, NoPerm()), PHeapPredicateLoc(pred, tArgs) === x)
         }))
       }
-      /** TODO
-      case ast.MagicWand => {
-
-      }
-      */
 
       // Quantified resource access
       case n@QuantifiedPermissionAssertion(forall, cond, ast.FieldAccessPredicate(ast.FieldAccess(rcv: ast.Exp, f: ast.Field), p: ast.Exp)) => {
@@ -408,12 +404,6 @@ class FunctionData(val programFunction: ast.Function,
   /*
    * Data collected during phases 1 (well-definedness checking) and 2 (verification)
    */
-
-  /* TODO: Analogous to fresh FVFs, Nadja records PSFs in the FunctionRecorder,
-   *       but they are never used. My guess is, that QP assertions over predicates
-   *       are currently not really supported (incomplete? unsound?)
-   */
-
   private[functions] var verificationFailures: Seq[FatalResult] = Vector.empty
   private[functions] var locToSnap: Map[ast.LocationAccess, Term] = Map.empty
   private[functions] var fappToSnap: Map[ast.FuncApp, Term] = Map.empty
