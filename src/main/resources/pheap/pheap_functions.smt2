@@ -3,6 +3,13 @@
 (declare-fun PHeap.subheap (PHeap PHeap) Bool)
 (declare-const PHeap.emp PHeap)
 
+(assert (forall ((h1 PHeap) (h2 PHeap)) (!
+	(implies
+		(= h1 h2)
+		(PHeap.equal h1 h2)
+	)
+	:pattern ((PHeap.equal h1 h2)))))
+
 (declare-fun PHeap.MWS (PHeap PHeap) PHeap)
 (declare-fun PHeap.LHS (PHeap) PHeap)
 (declare-fun PHeap.RHS (PHeap) PHeap)
