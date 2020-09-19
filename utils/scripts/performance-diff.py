@@ -111,7 +111,7 @@ if __name__ == "__main__":
 
     config = parser.parse_args()
 
-    config.TESTCLASS = 'FrontendGeneratedTests'
+    config.TESTCLASS = config.TESTCLASS[0]
     config.BASE = config.BASE[0]
     config.CMP = config.CMP[0]
 
