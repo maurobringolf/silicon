@@ -137,6 +137,7 @@ package object utils {
     case PHeapEqual(h1, h2) => h1 :: h2 :: Nil
     case PHeapCombine(h1, h2) => h1 :: h2 :: Nil
     case PHeapLookupField(_, _, h, at) => h :: at :: Nil
+    case PHeapFieldDomain(_,h) => h :: Nil
     case PHeapPredicateDomain(_, h) => Seq(h)
     case PHeapPredicateLoc(_, args) => args
     case PHeapPredicateLocInv(_,_,_,x) => Seq(x)
@@ -150,6 +151,9 @@ package object utils {
     case Lookup(_, fvf, at) => fvf :: at :: Nil
     case PHeapToFVF(_, _, h) => h :: Nil
     case FVFToPHeap(_, fvf) => fvf :: Nil
+    case PHeapLHS(h) => h :: Nil
+    case PHeapRHS(h) => h :: Nil
+    case PHeapMWS(h1,h2) => h1 :: h2 :: Nil
     case PermLookup(_, pm, at) => pm :: at :: Nil
     case PredicatePermLookup(_, pm, args) => Seq(pm) ++ args
     case FieldTrigger(_, fvf, at) => fvf :: at :: Nil

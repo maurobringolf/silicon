@@ -6,7 +6,6 @@
 
 package viper.silicon.interfaces
 
-import viper.silver.verifier.{VerificationError, errors, DummyNode, AbstractErrorReason}
 import viper.silicon.interfaces.state.Chunk
 import viper.silicon.state.Store
 import viper.silver.verifier.{Counterexample, Model, VerificationError}
