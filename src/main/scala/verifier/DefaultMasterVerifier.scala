@@ -162,7 +162,7 @@ class DefaultMasterVerifier(config: Config, override val reporter: PluginAwareRe
         if (!config.supportsLanguageFeature(lf)) {
           val unsupportedNodes = lf.isUsedBy(program)
           if (unsupportedNodes.nonEmpty) {
-            return List(Failure(verifier.errors.Internal(verifier.reasons.FeatureUnsupported(verifier.DummyNode, lf.describe(unsupportedNodes)))))
+            return unsupportedNodes.map(n => Failure(verifier.errors.Internal(verifier.reasons.FeatureUnsupported(n, lf.toString))))
           } 
         }
       })
