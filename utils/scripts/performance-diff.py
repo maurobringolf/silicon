@@ -11,14 +11,10 @@ import argparse
 csv.field_size_limit(sys.maxsize)
 
 parser = argparse.ArgumentParser(description='Create a plot illustrating the performance difference between two Silicon commits (or branches, tags, etc).')
-parser.add_argument('--base', metavar='base', type=str, nargs=1, default='source/master', dest='BASE',
-                   help='Base version')
-parser.add_argument('--cmp', metavar='cmp', type=str, nargs=1,default='master', dest='CMP',
-                   help='Compared version')
-parser.add_argument('--testClass', metavar='testClass', type=str, nargs=1,default='FrontendGeneratedTests', dest='TESTCLASS',
-                   help='Name of the Scala test class to be run')
-parser.add_argument('--run', dest='RUN',action='store_true',
-                   help='Actually do the test run. Default behavior only creates the plot from presumably existing CSV files.')
+parser.add_argument('--base', metavar='base', type=str, default='source/master', dest='BASE', help='Base version')
+parser.add_argument('--cmp', metavar='cmp', type=str, default='master', dest='CMP', help='Compared version')
+parser.add_argument('--testClass', metavar='testClass', type=str, default='FrontendGeneratedTests', dest='TESTCLASS', help='Name of the Scala test class to be run')
+parser.add_argument('--run', dest='RUN',action='store_true', help='Actually do the test run. Default behavior only creates the plot from presumably existing CSV files.')
 
 
 def shouldIncludeTest(baseResults, compareResults):
@@ -110,10 +106,6 @@ def createFileIfNotExists(fname):
 if __name__ == "__main__":
 
     config = parser.parse_args()
-
-    config.TESTCLASS = config.TESTCLASS[0]
-    config.BASE = config.BASE[0]
-    config.CMP = config.CMP[0]
 
     config.BASECSV = config.BASE.replace("/", "_") + ".csv"
     config.CMPCSV = config.CMP.replace("/", "_") + ".csv"
