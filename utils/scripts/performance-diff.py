@@ -69,6 +69,8 @@ def makePlot(config):
                 meanRatio = float(cmp[2])/float(base[2])
                 meanRatios += [meanRatio]
 
+                print(basename(base[0]) + ", " + str(meanRatio))
+
                 y1 += [ meanRatio * (1 + float(cmp[4])/200) ]
                 y2 += [ meanRatio * (1 - float(cmp[4])/200) ]
                 z1 += [ meanRatio * (1 + float(base[4])/200) ]
