@@ -65,6 +65,32 @@ class DefaultPHeapsContributor(preambleReader: PreambleReader[String, String],
     )
   }
 
+  private def wandSubstitutions(wand: ast.MagicWand, program: ast.Program) : Map[String, String] = {
+    val id = MagicWandIdentifier(wand, Verifier.program).toString
+    val formalArgs = (wand.subexpressionsToEvaluate(Verifier.program).zipWithIndex map ({ case (i, a) => 
+      val argName = f"arg${i}" 
+      Var(Identifier(argName), termConverter.convert(symbolConverter.toSort(a.typ)))
+	  }))
+    val mwArgs_q = formalArgs.map(a => 
+	    "(" + id + "_" + a.id.name + " " + a.sort + ")"
+	  ).mkString(" ")
+    val mwArgs = (formalArgs map (a => id + "_" + a.id.name)).mkString(" ")
+    val argSorts = (formalArgs map (_.sort)).mkString(" ")
+    val mwLoc = if (formalArgs.length > 0) {
+      "(PHeap.loc_" + id + " " + mwArgs + ")"
+    } else {
+      "PHeap.loc_" + id
+    }
+
+    Map(
+      "$PRD$" -> id,
+      "$PRD_ARGS_S$" -> argSorts,
+      "$PRD_ARGS_Q$" -> mwArgs_q,
+      "$PRD_ARGS$" -> mwArgs,
+      "$PRD_LOC$" -> mwLoc,
+    )
+  }
+
   private def addKeySuffix(m : Map[String, String], s : String) : Map[String, String] = m.map {
     case (k, v) => k.substring(0, k.length - 1) + s + "$" -> v
   }
@@ -127,21 +153,29 @@ class DefaultPHeapsContributor(preambleReader: PreambleReader[String, String],
     })
   }
 
-  def generatePredicateFunctionDecls(predicates: Seq[ast.Predicate]): Iterable[PreambleBlock] = {
+  def generatePredicateFunctionDecls(predicates: Seq[ast.Predicate], program: ast.Program): Iterable[PreambleBlock] = {
     val templateFile = "/pheap/predicate_functions.smt2"
 
     predicates map (p => {
       val declarations = preambleReader.readParametricPreamble(templateFile, predicateSubstitutions(p))
       (s"$templateFile [${p.name}]", declarations)
+    }) ++
+    wands map (mw => {
+      val declaration = preambleReader.readParametricPreamble(templateFile, wandSubstitutions(mw, program))
+      (s"$templateFile [${MagicWandIdentifier(mw, program)}]", declarations)
     })
   }
 
-  def pred_lookup_combine(predicates: Seq[ast.Predicate]): Iterable[PreambleBlock] = {
+  def pred_lookup_combine(predicates: Seq[ast.Predicate], program: ast.Program): Iterable[PreambleBlock] = {
     val templateFile = "/pheap/pred_lookup_combine.smt2"
 
     predicates map (p => {
       val declarations = preambleReader.readParametricPreamble(templateFile, predicateSubstitutions(p))
       (s"$templateFile [${p.name}]", declarations)
+    }) ++
+    wands map (mw => {
+      val declaration = preambleReader.readParametricPreamble(templateFile, wandSubstitutions(mw, program))
+      (s"$templateFile [${MagicWandIdentifier(mw, program)}]", declarations)
     })
   }
 
@@ -163,12 +197,16 @@ class DefaultPHeapsContributor(preambleReader: PreambleReader[String, String],
     })
   }
 
-  def pred_dom_combine(predicates: Seq[ast.Predicate]): Iterable[PreambleBlock] = {
+  def pred_dom_combine(predicates: Seq[ast.Predicate], program: ast.Program): Iterable[PreambleBlock] = {
     val templateFile = "/pheap/pred_dom_combine.smt2"
 
     predicates map (p => {
       val declarations = preambleReader.readParametricPreamble(templateFile, predicateSubstitutions(p))
       (s"PHeap.pred_dom_combine[${p.name}]", declarations)
+    }) ++
+    wands map (mw => {
+      val declaration = preambleReader.readParametricPreamble(templateFile, wandSubstitutions(mw, program))
+      (s"PHeap.pred_dom_combine [${MagicWandIdentifier(mw, program)}]", declarations)
     })
   }
   
@@ -243,13 +281,19 @@ class DefaultPHeapsContributor(preambleReader: PreambleReader[String, String],
     )
   }
 
-  def predicateSingletonFieldDomains(predicates: Seq[ast.Predicate], fields: Seq[ast.Field]): Iterable[PreambleBlock] = {
+  def predicateSingletonFieldDomains(wands: Seq[ast.MagicWand], predicates: Seq[ast.Predicate], fields: Seq[ast.Field], program: ast.Program): Iterable[PreambleBlock] = {
     val templateFile = "/pheap/predicate_singleton_field_domain.smt2"
 
     predicates flatMap (p => {
       fields map (f => {
         val declarations = preambleReader.readParametricPreamble(templateFile, fieldSubstitutions(f) ++ predicateSubstitutions(p))
         (s"predicate_singleton_field_domain (${p.name}, ${f.name})", declarations)
+      })
+    }) ++
+    wands flatMap (mw => {
+      fields map (f => {
+        val declarations = preambleReader.readParametricPreamble(templateFile, fieldSubstitutions(f) ++ wandSubstitutions(mw, program))
+        (s"predicate_singleton_field_domain (${MagicWandIdentifier(mw, program)}, ${f.name})", declarations)
       })
     })
   }
@@ -269,13 +313,19 @@ class DefaultPHeapsContributor(preambleReader: PreambleReader[String, String],
     })
   }
 
-  def fieldSingletonPredicateDomains(predicates: Seq[ast.Predicate], fields: Seq[ast.Field]): Iterable[PreambleBlock] = {
+  def fieldSingletonPredicateDomains(wands: Seq[ast.MagicWand], predicates: Seq[ast.Predicate], fields: Seq[ast.Field], program: ast.Program): Iterable[PreambleBlock] = {
     val templateFile = "/pheap/field_singleton_predicate_domain.smt2"
 
     predicates flatMap (p => {
       fields map (f => {
         val declarations = preambleReader.readParametricPreamble(templateFile, fieldSubstitutions(f) ++ predicateSubstitutions(p))
         (s"field_singleton_predicate_domain (${p.name}, ${f.name})", declarations)
+      })
+    })
+    wands flatMap (mw => {
+      fields map (f => {
+        val declarations = preambleReader.readParametricPreamble(templateFile, fieldSubstitutions(f) ++ wandSubstitutions(mw))
+        (s"field_singleton_predicate_domain (${MagicWandIdentifier(mw, program)}, ${f.name})", declarations)
       })
     })
   }

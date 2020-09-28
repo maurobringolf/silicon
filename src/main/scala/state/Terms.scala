@@ -1986,7 +1986,8 @@ object ResourceLookup {
     PHeapLookupPredicate(predicate.name, sm, args)
 
   def apply(wand: ast.MagicWand, sm: Term, args: Seq[Term]): Term = {
-    sys.error("QPMW not implemented.")
+    val wandId = MagicWandIdentifier(wand, Verifier.program).toString
+    PHeapLookupPredicate(wandId, sm, args)
   }
 }
 

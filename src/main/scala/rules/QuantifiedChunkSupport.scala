@@ -486,8 +486,7 @@ object quantifiedChunkSupporter extends QuantifiedChunkSupport with Immutable {
       case predicate: ast.Predicate =>
         SetIn(qvar, PHeapPredicateDomain(predicate.name, sm))
       case wand: ast.MagicWand =>
-        sys.error("QPMW not implemented.")
-        //SetIn(qvar, PredicateDomain(MagicWandIdentifier(wand, Verifier.program).toString, sm))
+        SetIn(qvar, PHeapPredicateDomain(MagicWandIdentifier(wand, Verifier.program).toString, sm))
     }
 
     val valueDefinitions =
@@ -617,8 +616,8 @@ object quantifiedChunkSupporter extends QuantifiedChunkSupport with Immutable {
         (PHeapToFVF(f.name, v.symbolConverter.toSort(f.typ), PHeapSingletonField(f.name, arguments.head, value)), True())
       case p: ast.Predicate =>
         (PHeapSingletonPredicate(p.name, arguments, value), True())
-      case mw: ast.MagicWand =>
-        sys.error("QPMW not implemented")
+      case wand: ast.MagicWand =>
+        (PHeapSingletonPredicate(MagicWandIdentifier(wand, Verifier.program).toString, arguments, value), True())
     }
   }
 
@@ -647,7 +646,8 @@ object quantifiedChunkSupporter extends QuantifiedChunkSupport with Immutable {
               case p: ast.Predicate => {
                 Seq(PHeapPredicateLoc(p.name, _instantiations))
               }
-              case _: ast.MagicWand => sys.error("QPMW not implemented.")
+              case wand: ast.MagicWand =>
+                Seq(PHeapPredicateLoc(MagicWandIdentifier(wand, Verifier.program).toString, _instantiations))
               case _: ast.Field => _instantiations
             }
 
@@ -667,7 +667,8 @@ object quantifiedChunkSupporter extends QuantifiedChunkSupport with Immutable {
             case p: ast.Predicate => {
               Seq(PHeapPredicateLoc(p.name, _instantiations))
             }
-            case _: ast.MagicWand => sys.error("QPMW not implemented.")
+            case wand: ast.MagicWand =>
+                Seq(PHeapPredicateLoc(MagicWandIdentifier(wand, Verifier.program).toString, _instantiations))
             case _: ast.Field => _instantiations
           }
 
@@ -876,13 +877,13 @@ object quantifiedChunkSupporter extends QuantifiedChunkSupport with Immutable {
     val codomainVarsInDomain = resource match {
       case field: ast.Field => SetIn(codomainVars.head, Domain(field.name, tSnap))
       case predicate: ast.Predicate => SetIn(PHeapPredicateLoc(predicate.name, codomainVars), PHeapPredicateDomain(predicate.name, tSnap))
-      case mw: ast.MagicWand => sys.error("QPMW not implemented.")
+      case wand: ast.MagicWand =>
+        val wandId = MagicWandIdentifier(wand, Verifier.program).toString
+        SetIn(PHeapPredicateLoc(wandId, codomainVars), PHeapPredicateDomain(wandId, tSnap))
     }
     v.decider.assume(Forall( codomainVars
                            , Iff(codomainVarsInDomain, condOfInv)
                            , if (Verifier.config.disableISCTriggers()) Nil else Seq(Trigger(codomainVarsInDomain))
-                           , "test"
-                           , isGlobal = true
                            ))
 
     val s1 =
@@ -905,7 +906,7 @@ object quantifiedChunkSupporter extends QuantifiedChunkSupport with Immutable {
     val value = resource match {
       case field: ast.Field => PHeapLookupField(field.name, v.symbolConverter.toSort(field.typ), tSnap, tArgs.head)
       case p: ast.Predicate => PHeapLookupPredicate(p.name, tSnap, tArgs)
-      case _: ast.MagicWand => sys.error("QPMW not implemented")
+      case wand: ast.MagicWand => PHeapLookupPredicate(MagicWandIdentifier(wand, Verifier.program).toString, tSnap, tArgs)
     }
     val (sm, smValueDef) = quantifiedChunkSupporter.singletonSnapshotMap(s, resource, tArgs, value, v)
     v.decider.prover.comment("Definitional axioms for singleton-SM's value")
@@ -942,7 +943,7 @@ object quantifiedChunkSupporter extends QuantifiedChunkSupport with Immutable {
     case f: ast.Field => FVFToPHeap(f.name, t)
     // No embedding needed, we already use PHeaps for quantified predicates
     case p: ast.Predicate => t
-    case _: ast.MagicWand => sys.error("QPMW not implemented.")
+    case _: ast.MagicWand => t
   }
 
   def consume(s: State,
@@ -1237,7 +1238,7 @@ object quantifiedChunkSupporter extends QuantifiedChunkSupport with Immutable {
           val snap = resource match {
             case field: ast.Field => PHeapSingletonField(field.name, arguments.head, snapVal)
             case p: ast.Predicate => snapVal
-            case _: ast.MagicWand => sys.error("QPMW not implemented.")
+            case _: ast.MagicWand => snapVal
           }
           Q(s2, h1, snap, v)
         case (Incomplete(_), _, _) =>
@@ -1420,7 +1421,7 @@ object quantifiedChunkSupporter extends QuantifiedChunkSupport with Immutable {
         case predicate: ast.Predicate =>
           sorts.PHeap
         case _: ast.MagicWand =>
-          sys.error("QPMW not implemented.")
+          sorts.PHeap
         case _ =>
           sys.error(s"Found yet unsupported resource $resource (${resource.getClass.getSimpleName})")
       }
