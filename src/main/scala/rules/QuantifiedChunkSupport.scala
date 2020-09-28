@@ -474,6 +474,10 @@ object quantifiedChunkSupporter extends QuantifiedChunkSupport with Immutable {
         toMap(codomainQVars.zipWithIndex.map({ case (a,i) =>
           (a, PHeapPredicateLocInv(p.name, i, a.sort, qvar))
         }))
+      case mw:ast.MagicWand =>
+        toMap(codomainQVars.zipWithIndex.map({ case (a,i) =>
+          (a, PHeapPredicateLocInv(MagicWandIdentifier(mw, Verifier.program).toString, i, a.sort, qvar))
+        }))
       case _ => Map()
     }
       //codomainQVars.zip(fromSnapTree(qvar, codomainQVars))(collection.breakOut)
@@ -1200,7 +1204,7 @@ object quantifiedChunkSupporter extends QuantifiedChunkSupport with Immutable {
             val snap = resource match {
               case f: ast.Field => PHeapSingletonField(f.name, arguments.head, ResourceLookup(resource, ch.snapshotMap, arguments))
               case p: ast.Predicate => ResourceLookup(resource, ch.snapshotMap, arguments) 
-              case _ => sys.error("Quantified resource not implemented: " ++ resource.toString)
+              case mw: ast.MagicWand => PHeapLookupPredicate(MagicWandIdentifier(mw, Verifier.program).toString, ch.snapshotMap, arguments)
             }
             Q(s4, s4.h, snap, v2)
           case _ =>
