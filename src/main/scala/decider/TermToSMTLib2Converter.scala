@@ -246,11 +246,15 @@ class TermToSMTLib2Converter
     case PHeapRestrict(f, h, args) => parens(text("PHeap.restrict_") <> f <+> convert(h) <+> args.map(a => convert(a)).mkString(" "))
 
     case PHeapPredicateLoc(p, args) => {
-      // TODO: Remove this hack
-      if (args.head.sort == sorts.Loc) {
-        render(args.head) 
+      if (args.length > 0) {
+        // TODO: Remove this hack
+        if (args.head.sort == sorts.Loc) {
+          render(args.head) 
+        } else {
+          parens(text("PHeap.loc_") <> p <+> args.map(a => convert(a)).mkString(" "))
+        }
       } else {
-        parens(text("PHeap.loc_") <> p <+> args.map(a => convert(a)).mkString(" "))
+        text("PHeap.loc_") <> p
       }
     }
     case PHeapPredicateLocInv(p, idx, _, l) => parens(text(predicateSupporter.inverseLocFunctionId(p, idx).name) <+> render(l))

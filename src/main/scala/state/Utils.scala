@@ -286,6 +286,10 @@ package object utils {
 
       case PHeapToFVF(f, fs, h) => PHeapToFVF(f,fs,go(h))
       case FVFToPHeap(f, fvf) => FVFToPHeap(f, go(fvf))
+
+      case PHeapLHS(h) => PHeapLHS(go(h))
+      case PHeapRHS(h) => PHeapRHS(go(h))
+      case PHeapMWS(h1,h2) => PHeapMWS(go(h1), go(h2))
     }
 
     val beforeRecursion = pre.applyOrElse(term, identity[Term])

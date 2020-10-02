@@ -246,7 +246,24 @@ class DefaultPHeapsContributor(preambleReader: PreambleReader[String, String],
                        , Seq(Trigger(PHeapPredicateLoc(p.name, pArgs.zipWithIndex.map({ case (a,i) => PHeapPredicateLocInv(p.name, i, a.sort, l)}))))
                        )
       Seq(inv1, inv2)
-    }))
+    })) ++
+    program.magicWandStructures.flatMap(mw => {
+      val formalArgs = mw.subexpressionsToEvaluate(program).zipWithIndex map ({ case (a,i) => Var(Identifier(f"arg$i") ,symbolConverter.toSort(a.typ)) })
+      val mwid = MagicWandIdentifier(mw, program).toString
+
+      formalArgs.zipWithIndex flatMap ({ case (a,i) => {
+        val inv1 = Forall( formalArgs
+                         , PHeapPredicateLocInv(mwid, i, a.sort, PHeapPredicateLoc(mwid, formalArgs)) === formalArgs(i)
+                         , Seq(Trigger(PHeapPredicateLocInv(mwid, i, a.sort, PHeapPredicateLoc(mwid, formalArgs))))
+                         )
+        val l = Var(Identifier("l"), sorts.Loc)
+        val inv2 = Forall( l
+                         , PHeapPredicateLoc(mwid, formalArgs.zipWithIndex.map({ case (a,i) => PHeapPredicateLocInv(mwid, i, a.sort, l)})) === l
+                         , Seq(Trigger(PHeapPredicateLoc(mwid, formalArgs.zipWithIndex.map({ case (a,i) => PHeapPredicateLocInv(mwid, i, a.sort, l)}))))
+                         )
+        Seq(inv1, inv2)
+      }})
+    })
   }
 
   def extensional_equality (program: ast.Program): Iterable[Term] = {
