@@ -364,7 +364,7 @@ class DefaultPHeapsContributor(preambleReader: PreambleReader[String, String],
           "(" + a.name + " " + termConverter.convert(symbolConverter.toSort(a.typ)) + ")"
       )).mkString(" ")
       (program.predicates map (p2 => {
-        if (p.name == p.name) {
+        if (p.name == p2.name) {
           ("", Seq())
         } else {
           val substitutions = predicateSubstitutions(p) ++ addKeySuffix(predicateSubstitutions(p2), "2")

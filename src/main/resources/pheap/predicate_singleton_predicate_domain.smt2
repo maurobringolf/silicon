@@ -13,9 +13,9 @@
 
 (assert (forall ($PRD_ARGS_Q2$ $PRD_ARGS_Q$ (h PHeap)) (!
 	(=
-		(PHeap.lookup_$PRD2$ (PHeap.remove_$PRD$ h $PRD_ARGS$) (PHeap.loc_$PRD2$ $PRD_ARGS2$))
-		(PHeap.lookup_$PRD2$ h (PHeap.loc_$PRD2$ $PRD_ARGS2$))
+		(PHeap.lookup_$PRD2$ (PHeap.remove_$PRD$ h $PRD_ARGS$) $PRD_LOC2$)
+		(PHeap.lookup_$PRD2$ h $PRD_LOC2$)
 	)
-	:pattern (PHeap.lookup_$PRD2$ (PHeap.remove_$PRD$ h $PRD_ARGS$) (PHeap.loc_$PRD2$ $PRD_ARGS2$))
+	:pattern (PHeap.lookup_$PRD2$ (PHeap.remove_$PRD$ h $PRD_ARGS$) $PRD_LOC2$)
 	:qid |lookup_$PRD2$_remove_$PRD$|)))
 
