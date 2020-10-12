@@ -383,12 +383,8 @@ class FunctionData(val programFunction: ast.Function,
         val tE1 = expressionTranslator.translatePrecondition(program, Seq(e1), this).head
         val e2Dom = getDomMap(e2)
         mergeDoms(dm, mergeDoms(e2Dom, Map.empty, Ite(tE1, _, _)))
-      /** TODO
-      case ast.InhaleExhaleExp(e1, e2) => {
-
-      }
-      */
-
+      case ast.InhaleExhaleExp(e1, e2) =>
+        go(e1, dm)
       // Any other assertion should be pure
       case a => if (a.isPure)
                   Map.empty
