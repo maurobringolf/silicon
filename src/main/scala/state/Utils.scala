@@ -14,7 +14,15 @@ package object utils {
   // Applies a simple search-and-replace strategy to project heap dependencies of a trigger to quantified variables
   // Splits the quantifier per trigger
   def makeTriggersHeapIndependent(q : Quantification, fresh: (String, Sort) => Var) : Seq[Quantification] = {
-    
+
+    /**
+     * [2020-10-12 Mauro]
+     *
+     * The two functions below are heavily coupled and need to match up in their cases.
+     * There are probably better ways of doing this, potentially using `deepCollect` and `transform`.
+     * Also, I did not try to make this implementation as complete as possible,
+     * so there might still be cases where a heap dependency is not projected out of the quantifier.
+     **/
     def computeHeapDeps(t: Term) : Seq[Term] = t match {
       case App(HeapDepFun(_,_,_), args) => args.flatMap(computeHeapDeps)
       case PHeapLookupField(f, s, h, at) => Seq(t)
@@ -28,7 +36,14 @@ package object utils {
       case _ => m.getOrElse(t, t)
     }
 
-    // TODO: Keep all heap-independent triggers under one quantifier instead of splitting
+    /**
+     * [2020-10-12 Mauro]
+     *
+     * In order to reduce the amount of transformation and unnecessary quantifier splitting,
+     * one could keep all heap-independent triggers under one quantifier.
+     * This version here will simply compute an empty heap dependency Map but split the quantifier per trigger anyway.
+     * My assumption is that these two alternatives behave exactly the same way.
+     **/
     q.triggers
       // : Seq[Trigger]
       // Find heap dependencies for each trigger separately
