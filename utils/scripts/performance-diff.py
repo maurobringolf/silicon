@@ -16,10 +16,6 @@ parser.add_argument('--cmp', metavar='cmp', type=str, default='master', dest='CM
 parser.add_argument('--testClass', metavar='testClass', type=str, default='FrontendGeneratedTests', dest='TESTCLASS', help='Name of the Scala test class to be run')
 parser.add_argument('--run', dest='RUN',action='store_true', help='Actually do the test run. Default behavior only creates the plot from presumably existing CSV files.')
 
-
-def shouldIncludeTest(baseResults, compareResults):
-    return baseResults[8] == compareResults[8] and float(baseResults[2]) > 0
-
 def checkoutAndRun(config):
     subprocess.run(f'git checkout {config.BASE}', shell=True)
     subprocess.run(f'git checkout {config.CMP} -- src/test/scala/{config.TESTCLASS}.scala', shell=True)
@@ -38,13 +34,16 @@ def makePlot(config):
             next(baseR)
             next(compareR)
 
+            baseResults = list(baseR)
+            compareResults = list(compareR)
 
-            # Filter out all tests with unequal verification results
-            relevantTests = filter(
-                lambda x: shouldIncludeTest(x[0], x[1]),
-                filter(
-                    # Not a complete test row (can happen on failed Silver parsing)
-                    lambda x: len(x[0]) >= 9 or len(x[1]) >= 9, zip(baseR, compareR)))
+            # Join on equal verification outputs
+            relevantTests = []
+
+            for b in list(baseResults):
+                for c in list(compareResults):
+                    if b[0] == c[0] and b[8] == c[8] and float(b[2]) > 0 and float(c[2]) > 0:
+                        relevantTests.append([b, c])
 
             testIndex = open(f"{config.TMPDIR}/testcase-index.txt", 'w+')
 
@@ -69,7 +68,7 @@ def makePlot(config):
                 meanRatio = float(cmp[2])/float(base[2])
                 meanRatios += [meanRatio]
 
-                print(basename(base[0]) + ", " + str(meanRatio) + ", " + str(int(base[2]) / 1000))
+                print(base[0] + ", " + str(meanRatio) + ", " + str(int(base[2]) / 1000))
 
                 y1 += [ meanRatio * (1 + float(cmp[4])/200) ]
                 y2 += [ meanRatio * (1 - float(cmp[4])/200) ]
