@@ -27,7 +27,6 @@ import viper.silver.ast.utility.rewriter.Traverse
 import viper.silver.cfg.silver.SilverCfg
 import viper.silver.plugin.PluginAwareReporter
 import viper.silver.verifier
-import viper.silver.ast.utility.LanguageFeature
 import viper.silver.reporter.{ConfigurationConfirmation, VerificationResultMessage}
 
 /* TODO: Extract a suitable MasterVerifier interface, probably including
@@ -156,18 +155,6 @@ class DefaultMasterVerifier(config: Config, override val reporter: PluginAwareRe
 
     Verifier.program = program
 
-    // Check language features support
-    LanguageFeature.values.map(lf => {
-      (program.methods ++ program.functions ++ program.predicates).map(mfp => {
-        if (!config.supportsLanguageFeature(lf)) {
-          val unsupportedNodes = lf.isUsedBy(program)
-          if (unsupportedNodes.nonEmpty) {
-            return unsupportedNodes.map(n => Failure(verifier.errors.Internal(verifier.reasons.FeatureUnsupported(n, lf.toString))))
-          } 
-        }
-      })
-    })
-
     predSnapGenerator.setup(program) // TODO: Why did Nadja put this here?
 
 
@@ -267,8 +254,6 @@ class DefaultMasterVerifier(config: Config, override val reporter: PluginAwareRe
      ++ predicateVerificationResults
      ++ methodVerificationResults)
   }
-
-  private def isSupported(s: State) : Boolean = s.qpFields.isEmpty && s.qpPredicates.isEmpty && s.qpMagicWands.isEmpty
 
   private def createInitialState(member: ast.Member, program: ast.Program): State = {
     val quantifiedFields = InsertionOrderedSet(ast.utility.QuantifiedPermissions.quantifiedFields(member, program))
