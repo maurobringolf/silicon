@@ -1,0 +1,17 @@
+field g : Int
+
+function f(xs: Seq[Ref], x: Ref) : Int
+	requires acc(x.g, none)
+	requires forall i : Int :: 0 < i && i < |xs| ==> acc(xs[i].g)
+
+method test() {
+	var xs : Seq[Ref] := Seq()
+	var x : Ref
+	x := new(g)
+	x.g := 1
+
+	assume f(xs,x) == 0
+	x.g := 0
+	assert f(xs,x) == 0
+
+}

@@ -1,0 +1,38 @@
+field f : Int
+field k : Int
+
+predicate P(x: Ref) {
+	acc(x.f) && acc(x.k)
+}
+
+function g(x: Ref) : Int
+	requires P(x)
+	requires (P(x) --* acc(x.f))
+{
+	applying (P(x) --* acc(x.f)) in x.f
+}
+
+method m(x: Ref) {
+	inhale acc(x.f) && acc(x.k)
+	var v : Int := x.f
+	fold P(x)
+	package (P(x) --* acc(x.f)) {
+		unfold P(x)
+	}
+	assert v == g(x)
+	/*
+ 	apply (P(x) --* acc(x.f))
+ 	assert x.f == v
+ 	*/
+}
+
+predicate Q(x: Ref) { P(x) }
+
+function g2(x: Ref) : Int
+	requires Q(x)
+	requires (P(x) --* acc(x.f))
+{
+	unfolding Q(x) in applying (P(x) --* acc(x.f)) in x.f
+}
+
+function g3(x: Ref) : Bool

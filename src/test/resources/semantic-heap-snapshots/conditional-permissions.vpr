@@ -1,0 +1,18 @@
+field f: Int
+
+predicate F(x: Ref)
+
+function fun01(y: Ref, b: Bool): Int
+  requires acc(F(y), b ? write : none)
+
+function fun02(y: Ref, b: Bool): Int
+  requires acc(y.f, b ? write : none)
+
+method test01(y: Ref, b: Bool)
+  requires acc(y.f)
+{
+  y.f := 0
+
+  assert fun01(y, false) == old(fun01(y, false))
+  assert fun02(y, false) == old(fun02(y, false))
+}

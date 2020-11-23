@@ -1,0 +1,15 @@
+field f : Int
+
+method test(x: Ref) {
+	var b : Bool
+
+	package acc(x.f) --* acc(x.f) {
+		inhale b
+	}
+
+	inhale acc(x.f)
+	apply acc(x.f) --* acc(x.f) 
+
+	//:: ExpectedOutput(assert.failed:assertion.false)
+	assert b
+}

@@ -1,0 +1,32 @@
+predicate P(i: Int, j: Int)
+
+/**
+ * Predicate arguments are required to be injective only as a tuple,
+ * but not each argument individually (which is a strictly stronger property).
+ */
+method injectiveOnlyAsTuple() {
+    inhale forall j: Int :: true ==> P(0, j)
+    assert forall j: Int :: true ==> P(0, j)
+}
+
+method injectiveIndividually() {
+    inhale forall j: Int :: true ==> P(-j, j)
+    assert forall j: Int :: true ==> P(-j, j)
+}
+
+method definitelyNotInjective() {
+    inhale forall j: Int :: true ==> P(0, 1)
+    //:: ExpectedOutput(assert.failed:receiver.not.injective)
+    assert forall j: Int :: true ==> P(0, 1)
+}
+
+method injectiveMultipleVariables() {
+    inhale forall i: Int, j: Int :: true ==> P(i, j)
+    assert forall i: Int, j: Int :: true ==> P(i, j)
+}
+
+method notInjectiveUnusedVariable() {
+    inhale forall i: Int, j: Int :: true ==> P(j, j)
+    //:: ExpectedOutput(assert.failed:receiver.not.injective)
+    assert forall i: Int, j: Int :: true ==> P(j, j)
+}

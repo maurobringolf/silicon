@@ -1,0 +1,46 @@
+field f : Int
+
+function f1(xs: Seq[Seq[Ref]]): Bool
+	requires forall i : Int, j: Int :: 0 <= i && i < |xs| && 0 <= j && j < |xs[i]| ==> acc(xs[i][j].f)
+{ f2(xs) }
+
+function f2(xs: Seq[Seq[Ref]]): Bool
+	requires forall i : Int, j: Int :: 0 <= i && i < |xs| && 0 <= j && j < |xs[i]| ==> acc(xs[i][j].f)
+
+function f3(xs: Seq[Seq[Ref]]): Bool
+	requires forall i : Int, j: Int :: 0 <= i && i < |xs| && 0 <= j && j < |xs[i]| ==> acc(xs[i][j].f, (i + j) % 2 == 0 ? write : none)
+
+method test1(xs: Seq[Seq[Ref]]) {
+	inhale forall i : Int, j: Int :: 0 <= i && i < |xs| && 0 <= j && j < |xs[i]| ==> acc(xs[i][j].f)
+	assume f2(xs)
+	assert f1(xs)
+}
+
+method test2(xs: Seq[Seq[Ref]]) {
+	inhale forall i : Int, j: Int :: 0 <= i && i < |xs| && 0 <= j && j < |xs[i]| ==> acc(xs[i][j].f)
+	assume f2(xs)
+
+	assume |xs| > 0
+	assume |xs[0]| > 0
+	xs[0][0].f := 1
+
+	//:: ExpectedOutput(assert.failed:assertion.false)
+	assert f1(xs)
+}
+
+method test3(xs: Seq[Seq[Ref]]) {
+	inhale forall i : Int, j: Int :: 0 <= i && i < |xs| && 0 <= j && j < |xs[i]| ==> acc(xs[i][j].f)
+	var b : Bool := f3(xs)
+
+	assume |xs| > 0
+	assume |xs[0]| > 1
+	xs[0][1].f := 1
+
+	assert f3(xs) == b
+
+	xs[0][0].f := 1
+
+	//:: ExpectedOutput(assert.failed:assertion.false)
+	assert f3(xs) == b
+}
+

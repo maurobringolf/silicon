@@ -1,0 +1,14 @@
+field f : Int
+field g: Int
+
+function fun(x: Ref): Int
+	requires [acc(x.f) && acc(x.g), acc(x.g) && acc(x.f)]
+{ x.f }
+
+method m(x: Ref)
+{
+	inhale acc(x.f) && x.f == 1
+	inhale acc(x.g) && x.g == 0
+	assert fun(x) == 1
+}
+

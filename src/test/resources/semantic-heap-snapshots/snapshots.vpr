@@ -1,0 +1,95 @@
+field f : Int
+
+predicate P1(xs: Seq[Ref]) {
+    |xs| > 0 && acc(xs[0].f) && xs[0].f == 0
+}
+
+predicate P2(xs: Seq[Ref]) {
+    |xs| > 0 && forall i : Int :: 0 <= i && i < |xs| ==> acc(xs[i].f) && xs[i].f == i
+}
+
+predicate P3(xs: Seq[Ref]) {
+    |xs| > 0 && forall i : Int :: 0 <= i && i < |xs| ==> acc(xs[i].f)
+}
+
+function g1(xs: Seq[Ref]) : Int
+    requires P1(xs)
+{
+    unfolding P1(xs) in xs[0].f
+}
+
+function g2(xs: Seq[Ref]) : Int
+    requires P2(xs)
+{
+    unfolding P2(xs) in xs[0].f
+}
+
+function g3(xs: Seq[Ref]) : Int
+    requires P3(xs)
+{
+    unfolding P3(xs) in xs[0].f
+}
+
+function g4(xs: Seq[Ref]) : Int
+    requires |xs| > 0
+    requires forall x : Ref :: x in xs ==> acc(x.f)
+{ xs[0].f }
+
+function g5(xs: Seq[Ref]) : Int
+    requires |xs| > 0
+    requires P2(xs)
+{ unfolding P2(xs) in g4(xs) }
+
+method test01(xs: Seq[Ref]) {
+    inhale |xs| > 0 && acc(xs[0].f) && xs[0].f == 0
+    fold P1(xs)
+    assert g1(xs) == 0
+}
+
+method test02(xs: Seq[Ref]) {
+    inhale |xs| > 0
+    inhale forall i : Int :: 0 <= i && i < |xs| ==> acc(xs[i].f) && xs[i].f == i
+    fold P2(xs)
+    assert g2(xs) == 0
+}
+
+method test03(xs: Seq[Ref]) {
+    inhale |xs| > 0
+    inhale forall i : Int :: 0 <= i && i < |xs| ==> acc(xs[i].f) && xs[i].f == i
+    fold P1(xs)
+    assert g1(xs) == 0
+}
+
+method test04(xs: Seq[Ref]) {
+    inhale |xs| > 0
+    inhale forall i : Int :: 0 <= i && i < |xs| ==> acc(xs[i].f) && xs[i].f == i
+    xs[0].f := xs[0].f + 1
+    fold P3(xs)
+    assert g3(xs) == 1
+}
+
+method test05(xs: Seq[Ref]) {
+    inhale |xs| > 0
+    inhale forall i : Int :: 0 <= i && i < |xs| ==> acc(xs[i].f) && xs[i].f == i
+    fold P2(xs)
+    assert g5(xs) == 0
+}
+
+function g6(xs: Seq[Ref]) : Int
+    requires |xs| >= 3
+    requires acc(xs[0].f) && acc(xs[1].f) && acc(xs[2].f)
+{
+    g7(xs)
+}
+
+function g7(xs: Seq[Ref]) : Int
+    requires |xs| >= 2
+    requires forall i : Int :: 0 <= i && i < 2 ==> acc(xs[i].f)
+
+method test06(xs: Seq[Ref]) {
+    inhale |xs| == 3
+    inhale forall i : Int :: 0 <= i && i < 3 ==> acc(xs[i].f)
+    inhale g7(xs) == 17
+    xs[2].f := 1
+    assert g6(xs) == 17
+}

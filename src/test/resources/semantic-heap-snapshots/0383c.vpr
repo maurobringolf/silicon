@@ -1,0 +1,84 @@
+field f: Int
+
+predicate P(x: Ref) {
+	acc(x.f)
+	// Commenting out the next line makes the test pass
+	&& true
+}
+
+method test1(xs: Seq[Ref])
+{
+	inhale forall i : Int :: 0 <= i && i < |xs| ==> acc(P(xs[i]))
+	inhale |xs| >= 2
+	unfold P(xs[0])
+	assume xs[0].f == 0
+	fold P(xs[0])
+
+	  //:: ExpectedOutput(assert.failed:assertion.false)
+	assert forall i : Int :: 0 <= i && i < |xs| ==> unfolding P(xs[i]) in xs[i].f == 0
+}
+
+method test2(xs: Seq[Ref])
+{
+	inhale forall i : Int :: 0 <= i && i < |xs| ==> acc(P(xs[i]))
+	inhale |xs| >= 2
+	unfold P(xs[0])
+	assume xs[0].f == 0
+	fold P(xs[0])
+
+    //:: ExpectedOutput(assert.failed:assertion.false)
+	assert unfolding P(xs[1]) in xs[1].f == 0
+}
+
+
+method test3(xs: Seq[Ref])
+	requires |xs| == 2
+	requires acc(xs[0].f)
+	requires acc(xs[1].f)
+{
+	// Follows from 'f' permissions, but Silicon needs the hint to use this fact for the injectivity check to succeed
+	assert xs[0] != xs[1]
+	xs[0].f := 0
+	fold P(xs[0])
+	fold P(xs[1])
+	assert forall j : Int :: 0 <= j && j < |xs| ==> P(xs[j])
+
+	unfold P(xs[1])
+	assert unfolding P(xs[0]) in xs[0].f == 0
+    //:: ExpectedOutput(assert.failed:assertion.false)
+	assert xs[1].f == 0
+}
+
+method test5(xs: Seq[Ref])
+	requires forall i : Int :: 0 <= i && i < |xs| ==> acc(P(xs[i]))
+	requires |xs| >= 2
+{
+	unfold P(xs[0])
+	xs[0].f := 0
+	fold P(xs[0])
+	var i : Int
+	assume 0 <= i && i < |xs|
+	unfold P(xs[i])
+    //:: ExpectedOutput(assert.failed:assertion.false)
+	assert xs[i].f == 0
+}
+
+method test6(xs: Seq[Ref])
+	requires forall i : Int :: 0 <= i && i < |xs| ==> acc(P(xs[i]))
+	requires |xs| >= 2
+{
+	unfold P(xs[0])
+	xs[0].f := 0
+	fold P(xs[0])
+    //:: ExpectedOutput(assert.failed:assertion.false)
+	assert forall i : Int :: 0 <= i && i < |xs| ==> unfolding P(xs[i]) in xs[i].f == 0
+}
+ 
+method test7(xs: Seq[Ref])
+	requires forall i : Int :: 0 <= i && i < |xs| ==> acc(P(xs[i]))
+	requires |xs| >= 2
+	requires forall j : Int :: 0 == j ==> unfolding P(xs[j]) in xs[j].f == 0
+{
+    //:: ExpectedOutput(assert.failed:assertion.false)
+	assert forall i : Int :: 0 <= i && i < |xs| ==> unfolding P(xs[i]) in xs[i].f == 0
+}

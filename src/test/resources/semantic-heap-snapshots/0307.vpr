@@ -1,0 +1,61 @@
+field f: Int
+field b: Bool
+
+method test00(x: Ref) {
+  inhale true --* acc(x.f) && x.f == 0
+  
+  var n: Int
+  n := applying (true --* acc(x.f) && x.f == 0) in x.f
+  
+  assert n == 0
+
+  //:: ExpectedOutput(assert.failed:assertion.false)
+  assert false
+}
+
+method test01(x: Ref) {
+  inhale acc(x.b)
+  
+  package acc(x.b) --* acc(x.b) {
+    if (x.b) {
+      assert x.b
+    } else {
+      assert !x.b
+    }
+  }
+  
+  var c: Bool
+  if (x.b) {
+    c := applying (acc(x.b) --* acc(x.b)) in x.b // Holds (soundly)
+    assert c
+  } else {
+    c := applying (acc(x.b) --* acc(x.b)) in !x.b // Holds (soundly)
+    assert c
+  }
+  
+  //:: ExpectedOutput(assert.failed:assertion.false)
+  assert false
+}
+
+method test02(x: Ref) {
+  inhale acc(x.b)
+  
+  package acc(x.b) --* true {
+    if (x.b) {
+      assert x.b
+    } else {
+      assert !x.b
+    }
+  }
+  
+  assert acc(x.b) --* true
+  
+  x.b := true  
+  assert applying (acc(x.b) --* true) in true
+  
+  x.b := false
+  assert applying (acc(x.b) --* true) in true
+
+  //:: ExpectedOutput(assert.failed:assertion.false)
+  assert false
+}

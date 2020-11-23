@@ -1,0 +1,56 @@
+field g: Int
+
+predicate P(x: Ref) {
+    acc(x.g) && true
+}
+
+predicate P2(x: Ref, i: Int) {
+    acc(x.g) && true
+}
+
+predicate Q(x: Ref) {
+    P(x) && true
+}
+
+function f(i:Int, j: Int) : Int
+
+function f3(i: Int) : Int
+
+function f4(i: Int) : Bool
+
+function f2(x: Ref, i: Int) : Int
+    requires P(x)
+
+method t(x: Ref) {
+    inhale P(x)
+    assume forall i:Int :: 0 <= i ==> f(unfolding P(x) in x.g, i) == 1
+    assert forall i:Int :: 0 <= i ==> f(unfolding P(x) in x.g, i) == 1
+}
+
+method t2(x: Ref) {
+    inhale Q(x)
+    assume forall i:Int :: 0 <= i ==> unfolding Q(x) in f2(x,i) == 1
+    assert forall i:Int :: 0 <= i ==> unfolding Q(x) in f2(x,i) == 1
+}
+
+method t3(x: Ref) {
+    inhale Q(x)
+    assume forall i:Int :: 0 <= i ==> unfolding Q(x) in f(unfolding P(x) in x.g, i) == 1
+    assert forall i:Int :: 0 <= i ==> unfolding Q(x) in f(unfolding P(x) in x.g, i) == 1
+}
+
+method t4(x: Ref) {
+  inhale P(x)
+
+  //x.f := 1
+
+  inhale forall i: Int :: {f(unfolding P(x) in x.g, i)} 0 <= i ==> f4(i)
+
+  exhale P(x)
+  inhale acc(x.g)
+
+  inhale f(x.g, 5) == 1
+  //:: ExpectedOutput(assert.failed:assertion.false)
+  assert f4(5)
+}
+

@@ -1,0 +1,17 @@
+predicate P(x: Ref)
+
+function f(xs: Seq[Ref], x: Ref) : Int
+	requires acc(P(x), none)
+	requires forall i : Int :: 0 < i && i < |xs| ==> P(xs[i])
+
+method test() {
+	var xs : Seq[Ref] := Seq()
+	var x : Ref
+    inhale P(x)
+
+	assume f(xs,x) == 0
+    exhale P(x)
+    inhale P(x)
+	assert f(xs,x) == 0
+
+}
